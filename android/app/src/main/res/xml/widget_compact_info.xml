@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Compact 4x1 widget (~64dp tall). v1 info (140dp / 4x2) is untouched. -->
+<appwidget-provider
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:initialLayout="@layout/widget_compact"
+    android:minWidth="180dp"
+    android:minHeight="56dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="56dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="0"
+    android:resizeMode="horizontal"
+    android:widgetCategory="home_screen"
+    android:previewLayout="@layout/widget_compact"
+    android:previewImage="@drawable/ic_widget_default_cover"
+    android:label="KumaFlow Compact"
+    android:description="@string/widget_description" />

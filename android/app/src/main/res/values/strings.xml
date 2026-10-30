@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">KumaFlow</string>
+    <string name="widget_name">Now Playing</string>
+    <string name="widget_description">Shows the currently playing track with controls</string>
+    <string name="widget_cover_art">Album cover</string>
+    <string name="widget_previous">Previous track</string>
+    <string name="widget_play_pause">Play/Pause</string>
+    <string name="widget_next">Next track</string>
+    <string name="widget_like">Like</string>
+    <string name="widget_dislike">Dislike</string>
+</resources>

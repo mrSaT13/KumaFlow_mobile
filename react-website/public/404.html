@@ -1,0 +1,26 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KumaFlow - Redirecting...</title>
+  <script>
+    // Single Page Apps for GitHub Pages
+    // This script handles direct access to /privacy or other routes
+    // by saving the path to sessionStorage and redirecting to root
+    const path = window.location.pathname;
+    const search = window.location.search;
+
+    // Save the original path so the React app can restore it
+    if (path && path !== '/') {
+      sessionStorage.setItem('spa_path', path);
+    }
+
+    // Redirect to root
+    window.location.href = '/' + search;
+  </script>
+</head>
+<body>
+  <p>Redirecting to KumaFlow...</p>
+</body>
+</html>

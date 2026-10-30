@@ -1,0 +1,149 @@
+/* ── Features ──────────────────────────────────────── */
+.features-header {
+    text-align: center;
+    margin-bottom: 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.features-title {
+    font-size: clamp(2rem, 4vw, 2.75rem);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+}
+
+.features-subtitle {
+    font-size: 17px;
+    color: var(--t2);
+    max-width: 520px;
+    line-height: 1.7;
+}
+
+/* ── Bento grid ── */
+.features-bento {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+}
+
+.feat-cell--wide {
+    grid-column: span 2;
+}
+
+/* Card */
+.feat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 26px;
+    height: 100%;
+    min-height: 175px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: background 0.28s ease, border-color 0.28s ease, transform 0.28s ease, box-shadow 0.28s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.feat-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+}
+
+.feat-card:hover {
+    background: var(--bg-card-h);
+    border-color: var(--border-h);
+    transform: translateY(-4px);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+}
+
+.feat-accent-line {
+    position: absolute;
+    top: 0;
+    left: 26px;
+    width: 30px;
+    height: 2px;
+    border-radius: 0 0 2px 2px;
+    opacity: 0;
+    transition: opacity 0.28s ease;
+}
+
+.feat-card:hover .feat-accent-line {
+    opacity: 1;
+}
+
+.feat-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.feat-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--t1);
+    letter-spacing: -0.01em;
+}
+
+.feat-desc {
+    font-size: 13.5px;
+    color: var(--t2);
+    line-height: 1.65;
+}
+
+/* Wide card layout */
+.feat-cell--wide .feat-card {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 18px;
+}
+
+.feat-cell--wide .feat-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 13px;
+    margin-top: 3px;
+}
+
+.feat-cell--wide .feat-title {
+    font-size: 19px;
+}
+
+.feat-cell--wide .feat-desc {
+    font-size: 14.5px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+    .features-bento {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .feat-cell--wide {
+        grid-column: span 2;
+    }
+}
+
+@media (max-width: 580px) {
+    .features-bento {
+        grid-template-columns: 1fr;
+    }
+
+    .feat-cell--wide {
+        grid-column: span 1;
+    }
+
+    .feat-cell--wide .feat-card {
+        flex-direction: column;
+    }
+}

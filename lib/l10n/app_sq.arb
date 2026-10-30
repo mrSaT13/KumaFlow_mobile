@@ -1,0 +1,739 @@
+﻿{
+  "@@locale": "sq",
+  "@@last_modified": "2026-02-07T16:10:00Z",
+  "appName": "KumaFlow",
+  "@appName": {
+    "description": "Application name"
+  },
+  "goodMorning": "Mirëmëngjes",
+  "@goodMorning": {
+    "description": "Morning greeting"
+  },
+  "goodAfternoon": "Mirëdita",
+  "@goodAfternoon": {
+    "description": "Afternoon greeting"
+  },
+  "goodEvening": "Mirëmbrëma",
+  "@goodEvening": {
+    "description": "Evening greeting"
+  },
+  "forYou": "Për ty",
+  "@forYou": {
+    "description": "For You section title"
+  },
+  "quickPicks": "Zgjedhje të shpejta",
+  "@quickPicks": {
+    "description": "Quick Picks section title"
+  },
+  "discoverMix": "Mix i zbulimit",
+  "@discoverMix": {
+    "description": "Discover Mix section title"
+  },
+  "recentlyPlayed": "Dëgjuar së fundmi",
+  "@recentlyPlayed": {
+    "description": "Recently played section title"
+  },
+  "yourPlaylists": "Listat e tua për dëgjim",
+  "@yourPlaylists": {
+    "description": "Your playlists section title"
+  },
+  "madeForYou": "Krijuar për ty",
+  "@madeForYou": {
+    "description": "Made for you section title"
+  },
+  "topRated": "Më të vlerësuarit",
+  "@topRated": {
+    "description": "Top rated albums title"
+  },
+  "noContentAvailable": "Nuk ka përmbajtje në dispozicion",
+  "@noContentAvailable": {
+    "description": "Message when no content is available"
+  },
+  "tryRefreshing": "Provoni të rifreskoni faqen ose kontrolloni lidhjen me serverin",
+  "@tryRefreshing": {
+    "description": "Message to try refreshing"
+  },
+  "refresh": "Rifresko",
+  "@refresh": {
+    "description": "Refresh button label"
+  },
+  "errorLoadingSongs": "Gabim gjatë ngarkimit të këngëve",
+  "@errorLoadingSongs": {
+    "description": "Error message when songs fail to load"
+  },
+  "noSongsInGenre": "Nuk ka këngë në këtë zhanër",
+  "@noSongsInGenre": {
+    "description": "Message when genre has no songs"
+  },
+  "errorLoadingAlbums": "Gabim gjatë ngarkimit të albumeve",
+  "@errorLoadingAlbums": {
+    "description": "Error message when albums fail to load"
+  },
+  "noTopRatedAlbums": "Asnjë album me vlerësim të lartë.",
+  "@noTopRatedAlbums": {
+    "description": "Message when there are no top rated albums"
+  },
+  "login": "Hyr në llogari",
+  "@login": {
+    "description": "Login button label"
+  },
+  "serverUrl": "URL-ja e serverit",
+  "@serverUrl": {
+    "description": "Server URL field label"
+  },
+  "username": "Emri i përdoruesit",
+  "@username": {
+    "description": "Username field label"
+  },
+  "password": "Password",
+  "@password": {
+    "description": "Password field label"
+  },
+  "selectCertificate": "Zgjidhni certifikatën TLS/SSL",
+  "@selectCertificate": {
+    "description": "Certificate selection dialog title"
+  },
+  "failedToSelectCertificate": "Dështoi zgjedhja e certifikatës: {error}",
+  "@failedToSelectCertificate": {
+    "description": "Error message when certificate selection fails",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "serverUrlMustStartWith": "URL-ja e serverit duhet të fillojë me http:// ose https://",
+  "@serverUrlMustStartWith": {
+    "description": "Error message for invalid server URL"
+  },
+  "failedToConnect": "Lidhja dështoi",
+  "@failedToConnect": {
+    "description": "Error message when connection fails"
+  },
+  "library": "Biblioteka",
+  "@library": {
+    "description": "Library tab label"
+  },
+  "search": "Kërko",
+  "@search": {
+    "description": "Search tab label"
+  },
+  "settings": "Cilësimet",
+  "@settings": {
+    "description": "Settings tab label"
+  },
+  "albums": "Albume",
+  "@albums": {
+    "description": "Albums section label"
+  },
+  "artists": "Artistët",
+  "@artists": {
+    "description": "Artists section label"
+  },
+  "songs": "Këngët",
+  "@songs": {
+    "description": "Songs section label"
+  },
+  "playlists": "Listat e dëgjimit",
+  "@playlists": {
+    "description": "Playlists section label"
+  },
+  "genres": "Zhanret",
+  "@genres": {
+    "description": "Genres section label"
+  },
+  "favorites": "Të preferuarat",
+  "@favorites": {
+    "description": "Favorites section label"
+  },
+  "nowPlaying": "Tani duke u luajtur",
+  "@nowPlaying": {
+    "description": "Now playing screen title"
+  },
+  "queue": "Radha",
+  "@queue": {
+    "description": "Queue section label"
+  },
+  "lyrics": "Tekstet e këngës",
+  "@lyrics": {
+    "description": "Lyrics section label"
+  },
+  "play": "Luaj",
+  "@play": {
+    "description": "Play button label"
+  },
+  "pause": "Pauzë",
+  "@pause": {
+    "description": "Pause button label"
+  },
+  "next": "Tjetra",
+  "@next": {
+    "description": "Next button label"
+  },
+  "previous": "E mëparshmja",
+  "@previous": {
+    "description": "Previous button label"
+  },
+  "shuffle": "Përzje",
+  "@shuffle": {
+    "description": "Shuffle button label"
+  },
+  "repeat": "Përsërit",
+  "@repeat": {
+    "description": "Repeat button label"
+  },
+  "repeatOne": "Përsërit njërën",
+  "@repeatOne": {
+    "description": "Repeat one button label"
+  },
+  "repeatOff": "Çaktivizo përsëritjen",
+  "@repeatOff": {
+    "description": "Repeat off button label"
+  },
+  "addToPlaylist": "Shto në listën e dëgjimit",
+  "@addToPlaylist": {
+    "description": "Add to playlist option"
+  },
+  "removeFromPlaylist": "Hiqe nga lista e dëgjimit",
+  "@removeFromPlaylist": {
+    "description": "Remove from playlist option"
+  },
+  "addToFavorites": "Shto tek të preferuarat",
+  "@addToFavorites": {
+    "description": "Add to favorites option"
+  },
+  "removeFromFavorites": "Hiqe nga të preferuarat",
+  "@removeFromFavorites": {
+    "description": "Remove from favorites option"
+  },
+  "download": "Shkarko",
+  "@download": {
+    "description": "Download button label"
+  },
+  "delete": "Fshi",
+  "@delete": {
+    "description": "Delete button label"
+  },
+  "cancel": "Anulo",
+  "@cancel": {
+    "description": "Cancel button label"
+  },
+  "ok": "Në rregull",
+  "@ok": {
+    "description": "OK button label"
+  },
+  "save": "Ruaj",
+  "@save": {
+    "description": "Save button label"
+  },
+  "close": "Mbyll",
+  "@close": {
+    "description": "Close button label"
+  },
+  "general": "Përgjithshme",
+  "@general": {
+    "description": "General settings section"
+  },
+  "appearance": "Pamja",
+  "@appearance": {
+    "description": "Appearance settings section"
+  },
+  "playback": "Riprodhimi",
+  "@playback": {
+    "description": "Playback settings section"
+  },
+  "storage": "Hapësira e ruajtjes",
+  "@storage": {
+    "description": "Storage settings section"
+  },
+  "about": "Rreth",
+  "@about": {
+    "description": "About settings section"
+  },
+  "darkMode": "Mënyra e errët",
+  "@darkMode": {
+    "description": "Dark mode setting"
+  },
+  "language": "Gjuha",
+  "@language": {
+    "description": "Language setting"
+  },
+  "version": "Versioni",
+  "@version": {
+    "description": "Version info label"
+  },
+  "madeBy": "Krijuar nga kumaflow",
+  "@madeBy": {
+    "description": "Developer credit"
+  },
+  "githubRepository": "Depoja në GitHub",
+  "@githubRepository": {
+    "description": "GitHub repository link label"
+  },
+  "reportIssue": "Raporto një problem",
+  "@reportIssue": {
+    "description": "Report issue link label"
+  },
+  "joinDiscord": "Bashkohu në komunitetin Discord",
+  "@joinDiscord": {
+    "description": "Discord community link label"
+  },
+  "unknownArtist": "Artist i panjohur",
+  "@unknownArtist": {
+    "description": "Placeholder for unknown artist"
+  },
+  "unknownAlbum": "Album i panjohur",
+  "@unknownAlbum": {
+    "description": "Placeholder for unknown album"
+  },
+  "playAll": "Riprodhi të gjitha",
+  "@playAll": {
+    "description": "Play all button label"
+  },
+  "shuffleAll": "Përziej të gjitha",
+  "@shuffleAll": {
+    "description": "Shuffle all button label"
+  },
+  "sortBy": "Rendit sipas",
+  "@sortBy": {
+    "description": "Sort by label"
+  },
+  "sortByName": "Emri",
+  "@sortByName": {
+    "description": "Sort by name option"
+  },
+  "sortByArtist": "Artist",
+  "@sortByArtist": {
+    "description": "Sort by artist option"
+  },
+  "sortByAlbum": "Album",
+  "@sortByAlbum": {
+    "description": "Sort by album option"
+  },
+  "sortByDate": "Data",
+  "@sortByDate": {
+    "description": "Sort by date option"
+  },
+  "sortByDuration": "Kohëzgjatja",
+  "@sortByDuration": {
+    "description": "Sort by duration option"
+  },
+  "ascending": "Rritëse",
+  "@ascending": {
+    "description": "Ascending sort order"
+  },
+  "descending": "Zbritëse",
+  "@descending": {
+    "description": "Descending sort order"
+  },
+  "noLyricsAvailable": "Nuk ka tekst këngësh në dispozicion",
+  "@noLyricsAvailable": {
+    "description": "Message when lyrics are not available"
+  },
+  "loading": "Duke u ngarkuar...",
+  "@loading": {
+    "description": "Loading message"
+  },
+  "error": "Gabim",
+  "@error": {
+    "description": "Generic error label"
+  },
+  "retry": "Provo përsëri",
+  "@retry": {
+    "description": "Button to retry a failed server connection"
+  },
+  "noResults": "Nuk u gjet asnjë rezultat",
+  "@noResults": {
+    "description": "No search results message"
+  },
+  "searchHint": "Kërko për këngë, albume, artistë...",
+  "@searchHint": {
+    "description": "Search field hint text"
+  },
+  "allSongs": "Të gjitha këngët",
+  "@allSongs": {
+    "description": "All songs title"
+  },
+  "allAlbums": "Të gjithë albumet",
+  "@allAlbums": {
+    "description": "All albums title"
+  },
+  "allArtists": "Të gjithë artistët",
+  "@allArtists": {
+    "description": "All artists title"
+  },
+  "trackNumber": "Kënga {number}",
+  "@trackNumber": {
+    "description": "Track number label",
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "songsCount": "{count, plural, =0{Asnjë këngë} =1{1 këngë} other{{count} këngë}}",
+  "@songsCount": {
+    "description": "Songs count with plural support",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "albumsCount": "{count, plural, =0{Asnjë album} =1{1 album} other{{count} albume}}",
+  "@albumsCount": {
+    "description": "Albums count with plural support",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "logout": "Çlogohu",
+  "@logout": {
+    "description": "Logout button label"
+  },
+  "confirmLogout": "A jeni të sigurt që dëshironi të çlogoheni?",
+  "@confirmLogout": {
+    "description": "Logout confirmation message"
+  },
+  "yes": "Po",
+  "@yes": {
+    "description": "Yes button label"
+  },
+  "no": "Jo",
+  "@no": {
+    "description": "No button label"
+  },
+  "offlineMode": "Mënyra pa internet",
+  "@offlineMode": {
+    "description": "Offline mode label"
+  },
+  "radio": "Radio",
+  "@radio": {
+    "description": "Radio section label"
+  },
+  "changelog": "Changelog",
+  "@changelog": {
+    "description": "Changelog link label"
+  },
+  "platform": "Platforma",
+  "@platform": {
+    "description": "Platform info label"
+  },
+  "server": "Serveri",
+  "@server": {
+    "description": "Server settings section"
+  },
+  "display": "Ekrani",
+  "@display": {
+    "description": "Display settings section"
+  },
+  "playerInterface": "Ndërfaqja e luajtësit",
+  "@playerInterface": {
+    "description": "Player Interface settings section"
+  },
+  "smartRecommendations": "Sugjerime inteligjente",
+  "@smartRecommendations": {
+    "description": "Smart Recommendations settings section title"
+  },
+  "showVolumeSlider": "Shfaq rregulluesin e volumit",
+  "@showVolumeSlider": {
+    "description": "Show Volume Slider toggle label"
+  },
+  "showVolumeSliderSubtitle": "Shfaq kontrollin e volumit në ekranin \"Duke u luajtur\"",
+  "@showVolumeSliderSubtitle": {
+    "description": "Show Volume Slider toggle subtitle"
+  },
+  "showStarRatings": "Shfaq vlerësimet me yje",
+  "@showStarRatings": {
+    "description": "Show Star Ratings toggle label"
+  },
+  "showStarRatingsSubtitle": "Vlerësoni këngët dhe shikoni vlerësimet",
+  "@showStarRatingsSubtitle": {
+    "description": "Show Star Ratings toggle subtitle"
+  },
+  "enableRecommendations": "Aktivizo sugjerimet",
+  "@enableRecommendations": {
+    "description": "Enable Recommendations toggle label"
+  },
+  "enableRecommendationsSubtitle": "Merrni sugjerime muzikore të personalizuara",
+  "@enableRecommendationsSubtitle": {
+    "description": "Enable Recommendations toggle subtitle"
+  },
+  "listeningData": "Të dhënat e dëgjimit",
+  "@listeningData": {
+    "description": "Listening Data section label"
+  },
+  "totalPlays": "{count} dëgjime gjithsej",
+  "@totalPlays": {
+    "description": "Total plays count",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "clearListeningHistory": "Pastro historikun e dëgjimit",
+  "@clearListeningHistory": {
+    "description": "Clear Listening History button label"
+  },
+  "confirmClearHistory": "Kjo do të fshijë të gjitha të dhënat tuaja të dëgjimit dhe sugjerimet. A jeni të sigurt?",
+  "@confirmClearHistory": {
+    "description": "Confirmation dialog for clearing history"
+  },
+  "historyCleared": "Historiku i dëgjimit u fshi",
+  "@historyCleared": {
+    "description": "SnackBar message when history is cleared"
+  },
+  "discordStatus": "Statusi në Discord",
+  "@discordStatus": {
+    "description": "Discord RPC toggle label"
+  },
+  "discordStatusSubtitle": "Shfaq këngën që po dëgjohet në profilin e Discord",
+  "@discordStatusSubtitle": {
+    "description": "Discord RPC toggle subtitle"
+  },
+  "selectLanguage": "Zgjidhni gjuhën",
+  "@selectLanguage": {
+    "description": "Language selection dialog title"
+  },
+  "systemDefault": "Parazgjedhja e sistemit",
+  "@systemDefault": {
+    "description": "System default language option"
+  },
+  "communityTranslations": "Përkthimet nga komuniteti",
+  "@communityTranslations": {
+    "description": "Community translations credit label"
+  },
+  "communityTranslationsSubtitle": "Ndihmoni në përkthimin e KumaFlow në Crowdin",
+  "@communityTranslationsSubtitle": {
+    "description": "Community translations credit subtitle"
+  },
+  "@_LIBRARY": {},
+  "yourLibrary": "Libraria juaj",
+  "filterAll": "Të gjitha",
+  "filterPlaylists": "Lista e këngëve",
+  "filterAlbums": "Albume",
+  "filterArtists": "Artisti",
+  "likedSongs": "Këngët e pëlqyera",
+  "radioStations": "Stazioni Radio",
+  "playlist": "Playlist",
+  "internetRadio": "Radio Internet",
+  "newPlaylist": "Playlisti e re",
+  "playlistName": "Emri i listës t'kngve",
+  "create": "Krijo",
+  "deletePlaylist": "Fshije listën t'kngve",
+  "deletePlaylistConfirmation": "A jeni t'sigurt qi doni me fshi listën e kngve \"{name}\"?",
+  "@deletePlaylistConfirmation": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "playlistDeleted": "Lista e kngve \"{name}\" u fshi",
+  "@playlistDeleted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "errorCreatingPlaylist": "Gabim gjatë krijimit t'listës t'kngve: {error}",
+  "@errorCreatingPlaylist": {
+    "placeholders": {
+      "error": {
+        "type": "Object"
+      }
+    }
+  },
+  "errorDeletingPlaylist": "Gabim gjatë fshirjes t'listës t'kngve: {error}",
+  "@errorDeletingPlaylist": {
+    "placeholders": {
+      "error": {
+        "type": "Object"
+      }
+    }
+  },
+  "playlistCreated": "Lista e kngve \"{name}\" u kriju",
+  "@playlistCreated": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@_SEARCH": {},
+  "searchTitle": "Kërko",
+  "searchPlaceholder": "Artistët, Kangët, Albumet",
+  "tryDifferentSearch": "Provo nji kërkim tjetër",
+  "noSuggestions": "S'ka sugjerime",
+  "browseCategories": "Shfleto Kategoritë",
+  "liveSearchSection": "Kërko",
+  "liveSearch": "Kërkim Live",
+  "liveSearchSubtitle": "Përditëso rezultatet n'kohë reale kuer t'shkrush n'vend se me qit nji listë t'poshtme",
+  "categoryMadeForYou": "Kriju për ty",
+  "categoryNewReleases": "Shtimet e reja",
+  "categoryTopRated": "Më të vlerësuarat",
+  "categoryGenres": "Zhanret",
+  "categoryFavorites": "Të preferuarat",
+  "categoryRadio": "Radio",
+  "@_SETTINGS_GENERAL": {},
+  "settingsTitle": "Cilësimet",
+  "tabPlayback": "Riprodhimi",
+  "tabStorage": "Magazina e të dhënave",
+  "tabServer": "Serveri",
+  "tabDisplay": "Ekrani",
+  "tabAbout": "Rreth",
+  "@_SETTINGS_PLAYBACK": {},
+  "sectionAutoDj": "AUTO DJ",
+  "autoDjMode": "Mënyra Auto DJ",
+  "songsToAdd": "Këngë për t'u shtuar: {count}",
+  "@songsToAdd": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sectionReplayGain": "NORMALIZIMI I VOLUMIT (REPLAYGAIN)",
+  "replayGainMode": "Mënyra",
+  "preamp": "Parapërforcimi: {value} dB",
+  "@preamp": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "preventClipping": "Parandalo Shformimin (Clipping)",
+  "fallbackGain": "Përforcimi i Rezervës (Fallback Gain): {value} dB",
+  "@fallbackGain": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "sectionStreamingQuality": "CILËSIA E STRIMIMIT",
+  "enableTranscoding": "Aktivizo Transkodimin",
+  "qualityWifi": "Cilësia në WiFi",
+  "qualityMobile": "Cilësia në Rrjetin Celular",
+  "format": "Formati",
+  "transcodingSubtitle": "Redukto përdorimin e të dhënave me cilësi më të ulët",
+  "modeOff": "Joaktivizuar",
+  "modeTrack": "Kënga",
+  "modeAlbum": "Album",
+  "@_SETTINGS_SERVER": {},
+  "sectionServerConnection": "LIDHJA ME SERVERIN",
+  "serverType": "Lloji i Serverit",
+  "notConnected": "Nuk është lidhur",
+  "unknown": "I panjohur",
+  "sectionMusicFolders": "DOSJET E MUZIKËS",
+  "musicFolders": "Dosjet e Muzikës",
+  "noMusicFolders": "Nuk u gjet asnjë dosje muzike",
+  "sectionAccount": "LLOGARIA",
+  "logoutConfirmation": "A jeni të sigurt që dëshironi të shkëputeni? Kjo do të fshijë gjithashtu të gjitha të dhënat e ruajtura (cache).",
+  "@_SETTINGS_STORAGE": {},
+  "sectionCacheSettings": "PARAMETRAT E CACHE",
+  "imageCache": "Cache i imazheve",
+  "musicCache": "Cache i muzikës",
+  "bpmCache": "Cache i BPM-ve",
+  "saveAlbumCovers": "Ruaj kopertinat e albumeve në pajisje",
+  "saveSongMetadata": "Ruaj të dhënat e këngëve (metadata) në pajisje",
+  "saveBpmAnalysis": "Ruaj analizën e BPM-ve në pajisje",
+  "sectionCacheCleanup": "PASTRIMI I CACHE",
+  "clearAllCache": "Pastro të gjithë Cache-in",
+  "allCacheCleared": "Gjithë cache-i u pastrua",
+  "sectionOfflineDownloads": "SHKARKIMET OFFLINE",
+  "downloadedSongs": "Këngët e shkarkuara",
+  "downloadingLibrary": "Duke shkarkuar bibliotekën... {progress}/{total}",
+  "@downloadingLibrary": {
+    "placeholders": {
+      "progress": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "downloadAllLibrary": "Shkarko të gjithë bibliotekën",
+  "downloadLibraryConfirm": "Kjo do të shkarkojë {count} këngë në pajisjen tuaj. Kjo mund të marrë pak kohë dhe të përdorë hapësirë të konsiderueshme ruajtjeje.\n\nVazhdo?",
+  "@downloadLibraryConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "libraryDownloadStarted": "Shkarkimi i bibliotekës filloi",
+  "deleteDownloads": "Fshi të gjitha shkarkimet",
+  "downloadsDeleted": "Të gjitha shkarkimet u fshinë",
+  "noSongsAvailable": "Nuk u gjet asnjë këngë. Ju lutem ngarkoni bibliotekën tuaj fillimisht.",
+  "@_SETTINGS_ABOUT": {},
+  "@_PLAYER_AND_MENUS": {},
+  "@_ALBUM_ARTIST_SCREENS": {},
+  "@_PLAYER_SCREENS": {},
+  "@_PLAYLIST_SCREEN": {},
+  "@_FAVORITES_SCREEN": {},
+  "@_HISTORY_SCREEN": {},
+  "@_SORT_OPTIONS": {},
+  "@_RADIO_SCREEN": {},
+  "@_LOGIN_SCREEN": {},
+  "@_COMMON_ACTIONS": {},
+  "@_DESKTOP_SIDEBAR": {},
+  "@_LYRICS": {},
+  "@_BANNERS": {},
+  "@_UPDATE_DIALOG": {},
+  "@_ARTIST_SCREEN": {},
+  "@_CAST_DLNA": {},
+  "@_LIKED_SONGS_SNACKBARS": {},
+  "@_PLAYER_BAR": {},
+  "@_CAST_TOOLTIPS": {},
+  "@_ERROR_MESSAGES": {},
+  "@_GENRE_SCREEN": {},
+  "@_JUKEBOX": {},
+  "@_MUSIC_FOLDERS": {},
+  "@internetRadio": {
+    "description": "Subtitle shown in the mini player and player bar when a radio station is playing"
+  },
+  "@sectionAutoDj": {
+    "description": "Playback settings section header for Auto DJ"
+  },
+  "@sectionStreamingQuality": {
+    "description": "Playback settings section header for transcoding / streaming quality"
+  },
+  "@replayGainMode": {
+    "description": "Label for the ReplayGain mode selector"
+  },
+  "@sectionCacheSettings": {
+    "description": "Storage settings section header"
+  },
+  "@sectionCacheCleanup": {
+    "description": "Storage settings section header for cache cleanup"
+  },
+  "@sectionOfflineDownloads": {
+    "description": "Storage settings section header for offline downloads"
+  },
+  "@clearAllCache": {
+    "description": "Button to clear all cached data"
+  },
+
+  "lyricsSection": "LYRICS",
+  "wordByWordSync": "Word-by-Word Sync",
+  "wordByWordSyncSubtitle": "Analyzes audio locally with Whisper AI for precise word highlighting",
+  "whisperModel": "Whisper Model",
+  "whisperModelSubtitle": "Download a model for on-device speech recognition",
+  "whisperModelTiny": "Tiny (~40 MB) — Fast",
+  "whisperModelBase": "Base (~140 MB) — Balanced",
+  "whisperModelSmall": "Small (~470 MB) — Accurate",
+  "downloadModel": "Download",
+  "downloadingModel": "Downloading…",
+  "modelReady": "Ready",
+  "wordSyncProcessing": "Syncing words…",
+  "wordSyncClearCache": "Clear Word Sync Cache",
+  "wordSyncClearCacheSubtitle": "Removes locally stored word timestamps",
+  "wordSyncNotSupported": "Not supported on this platform"
+}

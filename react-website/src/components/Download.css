@@ -1,0 +1,390 @@
+/* ── Download ───────────────────────────────────────── */
+.download {
+    background: linear-gradient(180deg, transparent 0%, rgba(255,45,85,0.03) 50%, transparent 100%);
+}
+
+/* Header */
+.dl-header {
+    text-align: center;
+    margin-bottom: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.dl-title {
+    font-size: clamp(2rem, 4vw, 2.75rem);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+}
+
+.dl-subtitle {
+    font-size: 17px;
+    color: var(--t2);
+    max-width: 480px;
+}
+
+/* Version pill */
+.dl-version {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 44px;
+    font-size: 14px;
+    color: var(--t2);
+}
+
+.dl-version-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #30d158;
+    box-shadow: 0 0 8px rgba(48, 209, 88, 0.6);
+    flex-shrink: 0;
+}
+
+.dl-version-name {
+    font-weight: 700;
+    color: var(--t1);
+    font-size: 15px;
+}
+
+.dl-version-sep {
+    color: var(--t3);
+}
+
+.dl-version-date {
+    color: var(--t3);
+}
+
+/* Platform grid */
+.dl-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 40px;
+}
+
+/* Card */
+.dl-card {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 22px 18px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    transition: background 0.25s, border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+    text-decoration: none;
+}
+
+.dl-card--available {
+    border-color: rgba(255, 45, 85, 0.2);
+}
+
+.dl-card--available:hover {
+    background: var(--bg-card-h);
+    border-color: rgba(255, 45, 85, 0.45);
+    box-shadow: 0 0 30px rgba(255, 45, 85, 0.12);
+}
+
+.dl-card--build:hover {
+    background: var(--bg-card-h);
+    border-color: var(--border-h);
+}
+
+.dl-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.dl-card-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-card-h);
+    color: var(--t1);
+}
+
+.dl-card--available .dl-card-icon {
+    background: var(--grad-red);
+    color: white;
+}
+
+.dl-card-status-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.dl-status-ok   { color: #30d158; }
+.dl-status-soon { color: var(--t3); }
+
+.dl-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.dl-card-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--t1);
+    letter-spacing: -0.01em;
+}
+
+.dl-card-sys {
+    font-size: 12px;
+    color: var(--t3);
+}
+
+.dl-card-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: var(--r-full);
+    font-size: 11px;
+    font-weight: 600;
+    margin-top: 6px;
+    width: fit-content;
+}
+
+.dl-badge--available {
+    background: var(--red-faint);
+    color: var(--red);
+    border: 1px solid rgba(255,45,85,0.2);
+}
+
+.dl-badge--build {
+    background: rgba(255,255,255,0.06);
+    color: var(--t2);
+    border: 1px solid var(--border);
+}
+
+/* GitHub CTA */
+.dl-github {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 24px 28px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    max-width: 760px;
+    margin: 0 auto;
+}
+
+.dl-github-left {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.dl-github-icon {
+    color: var(--t2);
+    flex-shrink: 0;
+}
+
+.dl-github-title {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.dl-github-desc {
+    font-size: 14px;
+    color: var(--t2);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .dl-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 680px) {
+    .dl-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .dl-github {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .dl-github-left {
+        flex-direction: column;
+        text-align: center;
+    }
+}
+
+@media (max-width: 420px) {
+    .dl-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+    font-size: var(--font-size-lg);
+    color: var(--color-text-secondary);
+}
+
+/* Version */
+.download-version {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-2xl);
+}
+
+.download-version-badge {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-lg);
+    background: var(--gradient-primary);
+    border-radius: var(--radius-full);
+}
+
+.download-version-number {
+    font-size: var(--font-size-xl);
+    font-weight: 800;
+}
+
+.download-version-label {
+    font-size: var(--font-size-sm);
+    opacity: 0.9;
+}
+
+.download-version-date {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-tertiary);
+}
+
+/* Platforms */
+.download-platforms {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--spacing-md);
+    max-width: 900px;
+    margin: 0 auto var(--spacing-3xl);
+}
+
+.download-card {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    transition: all var(--transition-normal);
+}
+
+.download-card:hover {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-border-hover);
+}
+
+.download-card.available {
+    border-color: rgba(250, 36, 60, 0.3);
+}
+
+.download-card.available:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 30px rgba(250, 36, 60, 0.15);
+}
+
+.download-card-icon {
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg-tertiary);
+    border-radius: var(--radius-lg);
+    flex-shrink: 0;
+}
+
+.download-card.available .download-card-icon {
+    background: var(--gradient-primary);
+}
+
+.download-card-content {
+    flex: 1;
+}
+
+.download-card-name {
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    margin-bottom: var(--spacing-xs);
+}
+
+.download-card-description {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.download-card-action {
+    color: var(--color-text-secondary);
+    flex-shrink: 0;
+}
+
+.download-card.available .download-card-action {
+    color: var(--color-primary);
+}
+
+/* GitHub */
+.download-github {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--spacing-xl);
+    padding: var(--spacing-xl);
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.download-github-content {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.download-github-content h3 {
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    margin-bottom: var(--spacing-xs);
+}
+
+.download-github-content p {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .download-platforms {
+        grid-template-columns: 1fr;
+    }
+
+    .download-github {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .download-github-content {
+        flex-direction: column;
+    }
+}

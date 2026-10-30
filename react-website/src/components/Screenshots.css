@@ -1,0 +1,421 @@
+/* ── Screenshots ────────────────────────────────────── */
+.screenshots {
+    background: linear-gradient(180deg, transparent 0%, rgba(255,45,85,0.025) 50%, transparent 100%);
+}
+
+.ss-header {
+    text-align: center;
+    margin-bottom: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.ss-title {
+    font-size: clamp(2rem, 4vw, 2.75rem);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+}
+
+.ss-subtitle {
+    font-size: 17px;
+    color: var(--t2);
+    max-width: 480px;
+}
+
+/* ── Stage ── */
+.ss-stage {
+    position: relative;
+    height: 540px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    perspective: 1200px;
+    margin-bottom: 36px;
+}
+
+.ss-glow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 500px;
+    height: 300px;
+    background: radial-gradient(ellipse, rgba(255,45,85,0.2) 0%, transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+    border-radius: 50%;
+}
+
+.ss-phones {
+    position: relative;
+    width: 260px;
+    height: 100%;
+}
+
+/* Individual phone */
+.ss-phone {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform-origin: center center;
+    translate: -50% -50%;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    outline: none;
+}
+
+.ss-phone-frame {
+    width: 225px;
+    height: 480px;
+    background: #141414;
+    border-radius: 36px;
+    overflow: hidden;
+    border: 2px solid rgba(255,255,255,0.1);
+    box-shadow: 0 30px 70px rgba(0,0,0,0.8);
+    position: relative;
+    transform-origin: center center;
+}
+
+.ss-phone--active .ss-phone-frame {
+    border-color: rgba(255,45,85,0.3);
+    box-shadow:
+        0 30px 80px rgba(0,0,0,0.8),
+        0 0 0 1px rgba(255,45,85,0.2);
+}
+
+.ss-phone-notch {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 72px;
+    height: 20px;
+    background: rgba(0,0,0,0.95);
+    border-radius: 10px;
+    z-index: 5;
+}
+
+.ss-phone-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.ss-phone-glow-ring {
+    position: absolute;
+    inset: -4px;
+    border-radius: 40px;
+    background: conic-gradient(from 0deg, rgba(255,45,85,0.6), rgba(255,45,85,0.1), rgba(255,45,85,0.6));
+    z-index: -1;
+    filter: blur(4px);
+    animation: spin-ring 4s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes spin-ring {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+/* Nav buttons */
+.ss-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 46px;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    color: var(--t1);
+    backdrop-filter: blur(12px);
+    transition: background 0.2s, border-color 0.2s, transform 0.2s;
+    z-index: 20;
+}
+
+.ss-nav:hover {
+    background: var(--bg-card-h);
+    border-color: var(--border-h);
+    transform: translateY(-50%) scale(1.1);
+}
+
+.ss-nav--prev { left: calc(50% - 200px); }
+.ss-nav--next { right: calc(50% - 200px); }
+
+/* Caption */
+.ss-caption {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.ss-caption-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--t1);
+    margin-bottom: 6px;
+    letter-spacing: -0.01em;
+}
+
+.ss-caption-desc {
+    font-size: 15px;
+    color: var(--t2);
+    max-width: 440px;
+    margin: 0 auto;
+}
+
+/* Dots */
+.ss-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+.ss-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--border-h);
+    border: none;
+    padding: 0;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.ss-dot--active {
+    background: var(--red);
+    width: 28px;
+    box-shadow: 0 0 10px var(--red-glow);
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    .ss-stage {
+        height: 460px;
+    }
+
+    .ss-phone-frame {
+        width: 195px;
+        height: 415px;
+    }
+
+    .ss-nav--prev { left: 6px; }
+    .ss-nav--next { right: 6px; }
+}
+
+@media (max-width: 480px) {
+    .ss-stage {
+        height: 390px;
+    }
+
+    .ss-phone-frame {
+        width: 170px;
+        height: 365px;
+        border-radius: 28px;
+    }
+}
+
+    font-size: var(--font-size-lg);
+    color: var(--color-text-secondary);
+}
+
+/* Gallery */
+.screenshots-gallery {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-xl);
+}
+
+/* Display */
+.screenshots-display {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+}
+
+.screenshot-main {
+    position: relative;
+    display: flex;
+    justify-content: center;
+}
+
+.screenshot-phone {
+    background: #1a1a1a;
+    border-radius: 40px;
+    padding: 8px;
+    box-shadow: var(--shadow-xl);
+    overflow: hidden;
+    max-width: 300px;
+}
+
+.screenshot-image {
+    width: 100%;
+    height: auto;
+    border-radius: 32px;
+    display: block;
+}
+
+.screenshot-glow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 150%;
+    height: 150%;
+    background: radial-gradient(ellipse, rgba(250, 36, 60, 0.15) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* Navigation */
+.screenshot-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    color: var(--color-text-primary);
+    backdrop-filter: blur(10px);
+    transition: all var(--transition-normal);
+    z-index: 10;
+}
+
+.screenshot-nav:hover {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-border-hover);
+    transform: translateY(-50%) scale(1.1);
+}
+
+.screenshot-nav-prev {
+    left: -60px;
+}
+
+.screenshot-nav-next {
+    right: -60px;
+}
+
+/* Info */
+.screenshot-info {
+    text-align: center;
+}
+
+.screenshot-title {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    margin-bottom: var(--spacing-xs);
+}
+
+.screenshot-description {
+    font-size: var(--font-size-base);
+    color: var(--color-text-secondary);
+}
+
+/* Thumbnails */
+.screenshots-thumbnails {
+    display: flex;
+    gap: var(--spacing-md);
+    justify-content: center;
+}
+
+.screenshot-thumbnail {
+    width: 60px;
+    height: 120px;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 2px solid var(--color-border);
+    transition: all var(--transition-normal);
+    padding: 0;
+    background: #1a1a1a;
+}
+
+.screenshot-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.6;
+    transition: opacity var(--transition-normal);
+}
+
+.screenshot-thumbnail:hover img {
+    opacity: 0.9;
+}
+
+.screenshot-thumbnail.active {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 20px rgba(250, 36, 60, 0.3);
+}
+
+.screenshot-thumbnail.active img {
+    opacity: 1;
+}
+
+/* Dots */
+.screenshots-dots {
+    display: none;
+    gap: var(--spacing-sm);
+    justify-content: center;
+}
+
+.screenshot-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: var(--radius-full);
+    background: var(--color-border);
+    border: none;
+    transition: all var(--transition-normal);
+    padding: 0;
+}
+
+.screenshot-dot.active {
+    background: var(--color-primary);
+    width: 30px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .screenshot-nav-prev {
+        left: 10px;
+    }
+
+    .screenshot-nav-next {
+        right: 10px;
+    }
+
+    .screenshots-thumbnails {
+        display: none;
+    }
+
+    .screenshots-dots {
+        display: flex;
+    }
+}
+
+@media (max-width: 480px) {
+    .screenshot-phone {
+        max-width: 250px;
+        border-radius: 32px;
+        padding: 6px;
+    }
+
+    .screenshot-image {
+        border-radius: 26px;
+    }
+
+    .screenshot-nav {
+        width: 40px;
+        height: 40px;
+    }
+}

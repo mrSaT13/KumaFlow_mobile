@@ -1,0 +1,6 @@
+# Release signing config (TEMPLATE - real values only in CI secrets / local key.properties)
+# Copy to key.properties and fill in locally. NEVER commit the real file.
+storePassword=CHANGEME
+keyPassword=CHANGEME
+keyAlias=kumaflow
+storeFile=kumaflow-release.keystore

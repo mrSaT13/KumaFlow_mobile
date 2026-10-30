@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fixed broken heart: two white halves with zigzag gap, renders correctly as alpha-only notification icon -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Left half of broken heart -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M11.5,5.55 C10.6,4.18 9.0,3.3 7.5,3.3 C4.6,3.3 2.4,5.55 2.4,8.5 C2.4,12.05 5.6,15.0 10.2,19.0 L11.5,20.1 L12.0,19.65 L13.2,17.2 L10.8,14.6 L12.8,11.2 L10.2,8.9 L12.0,5.55 Z"/>
+    <!-- Right half of broken heart -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M16.5,3.3 C15.0,3.3 13.4,4.18 12.5,5.55 L14.3,8.9 L11.7,11.2 L13.7,14.6 L11.3,17.2 L12.5,19.65 L13.8,20.1 C18.4,15.0 21.6,12.05 21.6,8.5 C21.6,5.55 19.4,3.3 16.5,3.3 Z"/>
+</vector>

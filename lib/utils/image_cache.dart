@@ -1,0 +1,48 @@
+import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../services/safe_image_cache_manager.dart';
+
+class ImageCacheConfig {
+  static void configure() {
+
+    PaintingBinding.instance.imageCache.maximumSize = 100;
+    PaintingBinding.instance.imageCache.maximumSizeBytes = 50 << 20;
+  }
+}
+
+class ImagePreloader {
+
+  static Future<void> preloadImages(
+    BuildContext context,
+    List<String> imageUrls,
+  ) async {
+    for (final url in imageUrls) {
+      if (url.isNotEmpty) {
+        try {
+          await precacheImage(
+            CachedNetworkImageProvider(url, cacheManager: SafeImageCacheManager.instance),
+            context,
+          );
+        } catch (_) {
+
+        }
+      }
+    }
+  }
+
+  static Future<void> preloadImage(
+    BuildContext context,
+    String imageUrl,
+  ) async {
+    if (imageUrl.isEmpty) return;
+
+    try {
+      await precacheImage(
+        CachedNetworkImageProvider(imageUrl, cacheManager: SafeImageCacheManager.instance),
+        context,
+      );
+    } catch (_) {
+
+    }
+  }
+}

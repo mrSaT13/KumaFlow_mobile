@@ -1,0 +1,1478 @@
+import 'dart:math';
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import '../models/models.dart';
+
+/// Service for fetching content from Yandex Music API.
+///
+/// Supports:
+/// - Artist/album search
+/// - Similar artists/albums
+/// - Cover art from Yandex CDN (new format)
+/// - Derived colors for dynamic theming
+/// - Landing/charts
+/// - Personal playlists
+/// - Mixes
+class YandexMusicService {
+  static const _baseUrl = 'https://api.music.yandex.net';
+
+  final Dio _dio;
+  String? _oauthToken;
+
+  YandexMusicService({Dio? dio, String? oauthToken})
+      : _dio = dio ?? Dio(),
+        _oauthToken = oauthToken {
+    _dio.options.headers['User-Agent'] = 'KumaFlow/3.0';
+    _dio.options.headers['Accept'] = 'application/json';
+    _dio.options.connectTimeout = const Duration(seconds: 10);
+    _dio.options.receiveTimeout = const Duration(seconds: 10);
+    if (_oauthToken != null && _oauthToken!.isNotEmpty) {
+      _dio.options.headers['Authorization'] = 'OAuth $_oauthToken';
+    }
+
+  }
+
+  DateTime? _lastRequestY;
+  static const int _minIntervalYMs = 450;
+
+  Future<void> _throttleY() async {
+    if (_lastRequestY != null) {
+      final elapsed = DateTime.now().difference(_lastRequestY!).inMilliseconds;
+      if (elapsed < _minIntervalYMs) {
+        await Future.delayed(Duration(milliseconds: _minIntervalYMs - elapsed));
+      }
+    }
+    _lastRequestY = DateTime.now();
+  }
+
+  // 429 retry helper - exponential backoff with jitter, respects Retry-After
+  Future<Response<T>> _dioGetWithRetry<T>(String path, {Map<String, dynamic>? queryParameters, dynamic data}) async {
+    int attempts = 0;
+    final rnd = Random();
+    while (true) {
+      try {
+        await _throttleY();
+        if (data != null) {
+          return await _dio.post<T>(path, data: data, queryParameters: queryParameters);
+        }
+        return await _dio.get<T>(path, queryParameters: queryParameters);
+      } on DioException catch (e) {
+        final code = e.response?.statusCode;
+        if (code == 429 && attempts < 3) {
+          attempts++;
+          int delayMs;
+          final retryAfter = e.response?.headers.value('Retry-After') ?? e.response?.headers.value('retry-after');
+          if (retryAfter != null) {
+            final secs = int.tryParse(retryAfter.trim());
+            if (secs != null) delayMs = secs * 1000 + rnd.nextInt(400);
+            else delayMs = 1200 * (1 << (attempts - 1)) + rnd.nextInt(500);
+          } else {
+            delayMs = 1200 * (1 << (attempts - 1)) + rnd.nextInt(500);
+          }
+          if (delayMs > 10000) delayMs = 10000;
+          debugPrint('[YandexMusic] 429 retry $attempts/3 after ${delayMs}ms for $path');
+          await Future.delayed(Duration(milliseconds: delayMs));
+          continue;
+        }
+        rethrow;
+      }
+    }
+  }
+
+  /// Set OAuth token for authenticated requests.
+  void setToken(String token) {
+    _oauthToken = token.trim();
+    if (_oauthToken!.isNotEmpty) {
+      _dio.options.headers['Authorization'] = 'OAuth $_oauthToken';
+    }
+  }
+
+  bool get hasToken => _oauthToken != null && _oauthToken!.isNotEmpty;
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Search
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /// Search for artists on Yandex Music.
+  Future<List<YandexArtistResult>> searchArtists(String query) async {
+    try {
+      final response = await _dioGetWithRetry(
+        '$_baseUrl/search',
+        queryParameters: {
+          'text': query,
+          'type': 'artist',
+          'page': 0,
+          'nococrrect': false,
+        },
+      );
+
+      final result = response.data['result'];
+      if (result == null) return [];
+
+      final artistsResult = result['artists'];
+      if (artistsResult == null) return [];
+
+      final results = artistsResult['results'] as List? ?? [];
+      return results.map((e) => YandexArtistResult.fromJson(e)).toList();
+    } catch (e) {
+      debugPrint('[YandexMusic] Search artists error: $e');
+      return [];
+    }
+  }
+
+  /// Search for albums on Yandex Music.
+  Future<List<YandexAlbumResult>> searchAlbums(String query) async {
+    try {
+      final response = await _dioGetWithRetry(
+        '$_baseUrl/search',
+        queryParameters: {
+          'text': query,
+          'type': 'album',
+          'page': 0,
+          'nococrrect': false,
+        },
+      );
+
+      final result = response.data['result'];
+      if (result == null) return [];
+
+      final albumsResult = result['albums'];
+      if (albumsResult == null) return [];
+
+      final results = albumsResult['results'] as List? ?? [];
+      return results.map((e) => YandexAlbumResult.fromJson(e)).toList();
+    } catch (e) {
+      debugPrint('[YandexMusic] Search albums error: $e');
+      return [];
+    }
+  }
+
+  /// Search for tracks on Yandex Music.
+  Future<List<YandexTrackResult>> searchTracks(String query) async {
+    try {
+      final response = await _dioGetWithRetry(
+        '$_baseUrl/search',
+        queryParameters: {
+          'text': query,
+          'type': 'track',
+          'page': 0,
+        },
+      );
+
+      final result = response.data['result'];
+      if (result == null) return [];
+
+      final tracksResult = result['tracks'];
+      if (tracksResult == null) return [];
+
+      final results = tracksResult['results'] as List? ?? [];
+      return results.map((e) => YandexTrackResult.fromJson(e)).toList();
+    } catch (e) {
+      debugPrint('[YandexMusic] Search tracks error: $e');
+      return [];
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Artist info
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /// Get artist brief info (includes similar artists, covers, colors).
+  Future<YandexArtistResult?> getArtistInfo(String artistId) async {
+    try {
+      final response = await _dioGetWithRetry(
+        '$_baseUrl/artists/$artistId/brief-info',
+      );
+
+      final result = response.data['result'];
+      if (result == null) return null;
+
+      final artistData = result['artist'];
+      if (artistData == null) return null;
+
+      final artist = YandexArtistResult.fromJson(artistData);
+
+      // Parse similar artists
+      final similarData = result['similarArtists'] as List? ?? [];
+      artist.similarArtists = similarData
+          .map((e) => YandexArtistResult.fromJson(e))
+          .toList();
+
+      // Parse derived colors
+      final colors = result['derivedColors'];
+      if (colors != null) {
+        artist.derivedColors = YandexDerivedColors.fromJson(colors);
+      }
+
+      // Parse allCovers
+      final allCovers = result['allCovers'] as List? ?? [];
+      artist.allCovers = allCovers
+          .map((e) => YandexCoverSpec.fromJson(e))
+          .toList();
+
+      return artist;
+    } catch (e) {
+      debugPrint('[YandexMusic] Artist info error: $e');
+      return null;
+    }
+  }
+
+  /// Get similar artists for a given artist ID.
+  Future<List<YandexArtistResult>> getSimilarArtists(String artistId) async {
+    try {
+      final info = await getArtistInfo(artistId);
+      return info?.similarArtists ?? [];
+    } catch (e) {
+      debugPrint('[YandexMusic] Similar artists error: $e');
+      return [];
+    }
+  }
+
+  /// Get artist's top tracks.
+  Future<List<YandexTrackResult>> getArtistTopTracks(String artistId) async {
+    try {
+      final response = await _dioGetWithRetry(
+        '$_baseUrl/artists/$artistId/top-tracks',
+        queryParameters: {'chart': 'all-time'},
+      );
+
+      final result = response.data['result'];
+      if (result == null) return [];
+
+      final tracks = result['tracks'] as List? ?? [];
+      return tracks.map((e) => YandexTrackResult.fromJson(e)).toList();
+    } catch (e) {
+      debugPrint('[YandexMusic] Artist top tracks error: $e');
+      return [];
+    }
+  }
+
+  /// Resolve Yandex artistId from Subsonic id or name (search fallback).
+  Future<String?> _resolveYandexArtistId(String artistId, {String? artistName}) async {
+    // If looks like Yandex numeric id, try directly
+    if (RegExp(r'^\d+$').hasMatch(artistId)) {
+      try {
+        final test = await getArtistInfo(artistId);
+        if (test != null && test.id == artistId) return artistId;
+      } catch (_) {}
+    }
+    // Fallback: search by artistName or by artistId string as query
+    final query = (artistName != null && artistName.isNotEmpty) ? artistName : artistId;
+    final results = await searchArtists(query);
+    if (results.isNotEmpty) return results.first.id;
+    return null;
+  }
+
+  /// Get artist images (photos). Works without token (public covers) + with token.
+  /// Accepts Subsonic artistId — will resolve via search if needed.
+  Future<List<YandexImageResult>> getArtistImages(String artistId, {String? artistName}) async {
+    try {
+      String yandexId = artistId;
+      // If not numeric Yandex id, resolve via search
+      if (artistName != null || !RegExp(r'^\d+$').hasMatch(artistId)) {
+        final resolved = await _resolveYandexArtistId(artistId, artistName: artistName);
+        if (resolved == null) {
+          debugPrint('[YandexMusic] Artist images: cannot resolve $artistId / $artistName');
+          return [];
+        }
+        yandexId = resolved;
+      }
+      final response = await _dioGetWithRetry(
+        '$_baseUrl/artists/$yandexId/brief-info',
+      );
+
+      final result = response.data['result'];
+      if (result == null) return [];
+
+      final images = <YandexImageResult>[];
+
+      // Get cover images
+      final allCovers = result['allCovers'] as List? ?? [];
+      for (final cover in allCovers) {
+        final uri = cover['uri'] as String?;
+        if (uri != null) {
+          final url = getCoverUrl(uri, size: 'orig');
+          if (url != null) {
+            images.add(YandexImageResult(
+              url: url,
+              type: 'cover',
+            ));
+          }
+        }
+      }
+
+      // Get artist photos from search
+      final artistResult = result['artist'];
+      if (artistResult != null) {
+        final cover = artistResult['cover'];
+        if (cover is Map<String, dynamic>) {
+          final uri = cover['uri'] as String?;
+          if (uri != null) {
+            final url = getCoverUrl(uri, size: 'orig');
+            if (url != null) {
+              images.add(YandexImageResult(
+                url: url,
+                type: 'artist',
+              ));
+            }
+          }
+        }
+      }
+
+      // Additional covers via album search (по имени артиста) — решает "не все обложки"
+      if (images.length < 12 && artistName != null && artistName.isNotEmpty) {
+        try {
+          final albums = await searchAlbums(artistName);
+          final seenUrls = images.map((e) => e.url).toSet();
+          for (final al in albums.take(12)) {
+            final uri = al.coverUri;
+            if (uri == null) continue;
+            final url = getCoverUrl(uri, size: 'orig');
+            if (url != null && seenUrls.add(url)) {
+              images.add(YandexImageResult(url: url, type: 'cover'));
+              if (images.length >= 20) break;
+            }
+          }
+        } catch (_) {}
+      }
+
+      // Direct-albums covers — точные обложки артиста (сортировка по году, без сборников)
+      try {
+        final directResp = await _dioGetWithRetry(
+          '$_baseUrl/artists/$yandexId/direct-albums',
+          queryParameters: {'page': 0, 'page-size': 20, 'sort-by': 'year'},
+        );
+        final directResult = directResp.data['result'];
+        List? directAlbums;
+        if (directResult is Map) {
+          directAlbums = directResult['albums'] as List?;
+        } else if (directResult is List) {
+          directAlbums = directResult;
+        }
+        if (directAlbums != null && directAlbums.isNotEmpty) {
+          final seenUrls = images.map((e) => e.url).toSet();
+          for (final raw in directAlbums.take(20)) {
+            final m = (raw as Map).cast<String, dynamic>();
+            final uri = m['coverUri'] as String? ?? m['ogImage'] as String?;
+            if (uri == null) continue;
+            final url = getCoverUrl(uri, size: 'orig');
+            if (url != null && seenUrls.add(url)) {
+              images.add(YandexImageResult(url: url, type: 'cover'));
+              if (images.length >= 30) break;
+            }
+          }
+        }
+      } catch (_) {}
+
+      return images;
+    } catch (e) {
+      debugPrint('[YandexMusic] Artist images error: $e');
+      return [];
+    }
+  }
+
+  /// Get artist video clips. Accepts Subsonic id — resolves via search.
+  Future<List<YandexVideoResult>> getArtistVideos(String artistId, {String? artistName}) async {
+    try {
+      String yandexId = artistId;
+      if (artistName != null || !RegExp(r'^\d+$').hasMatch(artistId)) {
+        final resolved = await _resolveYandexArtistId(artistId, artistName: artistName);
+        if (resolved == null) {
+          debugPrint('[YandexMusic] Artist videos: cannot resolve $artistId / $artistName');
+          return [];
+        }
+        yandexId = resolved;
+      }
+      final response = await _dioGetWithRetry(
+        '$_baseUrl/artists/$yandexId/brief-info',
+      );
+
+      final result = response.data['result'];
+      if (result == null) return [];
+
+      final videos = <YandexVideoResult>[];
+      final rawVideos = result['videos'] as List? ?? [];
+
+      for (final video in rawVideos) {
+        videos.add(YandexVideoResult.fromJson(video));
+      }
+
+      // Fallback по имени артиста через search video (клипы часто не в brief-info)
+      if (videos.length < 5 && artistName != null && artistName.isNotEmpty) {
+        try {
+          final resp = await _dioGetWithRetry(
+            '$_baseUrl/search',
+            queryParameters: {'text': artistName, 'type': 'video', 'page': 0, 'pageSize': 12},
+          );
+          final r = resp.data['result'];
+          List? res;
+          if (r != null) {
+            res = (r['videos']?['results'] as List?) ?? (r['videos'] as List?);
+          }
+          if (res != null) {
+            for (final v in res.take(12)) {
+              try {
+                if (v is Map<String, dynamic>) {
+                  final title = v['title']?.toString() ?? v['name']?.toString() ?? artistName;
+                  String? cover = v['cover']?.toString() ?? v['ogImage']?.toString() ?? v['thumbnail']?.toString() ?? v['coverUri']?.toString();
+                  if (cover != null && cover.isNotEmpty) {
+                    cover = YandexMusicService.getCoverUrl(cover, size: '400x225') ?? cover;
+                    if (cover.contains('%%')) cover = cover.replaceAll('%%', '400x225');
+                    if (!cover.startsWith('http')) cover = 'https://$cover';
+                  }
+                  final pid = v['providerVideoId']?.toString() ?? v['id']?.toString();
+                  if ((cover == null || cover.isEmpty) && pid != null && pid.isNotEmpty) {
+                    cover = 'https://img.youtube.com/vi/$pid/hqdefault.jpg';
+                  }
+                  final embed = v['embedUrl']?.toString() ?? v['url']?.toString();
+                  if (!videos.any((e) => e.title == title)) {
+                    videos.add(YandexVideoResult(
+                      title: title,
+                      thumbnailUrl: cover,
+                      embedUrl: embed,
+                      provider: v['provider']?.toString() ?? 'Yandex',
+                      providerVideoId: pid,
+                    ));
+                  }
+                }
+              } catch (_) {}
+            }
+          }
+        } catch (_) {}
+      }
+
+      return videos;
+    } catch (e) {
+      debugPrint('[YandexMusic] Artist videos error: $e');
+      return [];
+    }
+  }
+
+  /// Get lyrics for a track.
+  Future<YandexLyricsResult?> getTrackLyrics(String trackId) async {
+    try {
+      final response = await _dioGetWithRetry(
+        '$_baseUrl/tracks/$trackId/lyrics',
+      );
+
+      final result = response.data['result'];
+      if (result == null) return null;
+
+      return YandexLyricsResult.fromJson(result);
+    } catch (e) {
+      debugPrint('[YandexMusic] Track lyrics error: $e');
+      return null;
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Album info
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /// Get album details.
+  Future<YandexAlbumResult?> getAlbumInfo(String albumId) async {
+    try {
+      final response = await _dioGetWithRetry(
+        '$_baseUrl/albums/$albumId',
+      );
+
+      final result = response.data['result'];
+      if (result == null) return null;
+
+      final albumData = result['album'];
+      if (albumData == null) return null;
+
+      return YandexAlbumResult.fromJson(albumData);
+    } catch (e) {
+      debugPrint('[YandexMusic] Album info error: $e');
+      return null;
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Landing / Charts / New releases
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /// Get Yandex Music landing page with blocks.
+  Future<YandexLandingResult?> getLanding() async {
+    try {
+      final response = await _dio.post(
+        '$_baseUrl/landing3',
+        data: {
+          'catalogue': 'music',
+          'genre': 'all',
+          'language': 'ru',
+        },
+      );
+
+      final result = response.data['result'];
+      if (result == null) return null;
+
+      return YandexLandingResult.fromJson(result);
+    } catch (e) {
+      debugPrint('[YandexMusic] Landing error: $e');
+      return null;
+    }
+  }
+
+  /// Get new releases from Yandex Music.
+  Future<List<YandexAlbumResult>> getNewReleases() async {
+    try {
+      final landing = await getLanding();
+      if (landing == null) return [];
+
+      final newReleasesBlock = landing.blocks.firstWhere(
+        (b) => b.type.contains('new-releases') || b.type.contains('album'),
+        orElse: () => YandexLandingBlock.empty(),
+      );
+
+      return newReleasesBlock.albums;
+    } catch (e) {
+      debugPrint('[YandexMusic] New releases error: $e');
+      return [];
+    }
+  }
+
+  /// Get charts from Yandex Music.
+  Future<List<YandexTrackResult>> getCharts() async {
+    try {
+      final landing = await getLanding();
+      if (landing == null) return [];
+
+      // Charts are typically in the landing blocks
+      return [];
+    } catch (e) {
+      debugPrint('[YandexMusic] Charts error: $e');
+      return [];
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // User Playlists & My Wave
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /// Get user's playlists from Yandex Music.
+  Future<List<YandexPlaylistResult>> getUserPlaylists() async {
+    if (!hasToken) return [];
+    try {
+      final response = await _dioGetWithRetry('$_baseUrl/users/me/playlists/list');
+      final result = response.data['result'];
+      if (result == null) return [];
+
+      final playlists = result['playlists'] as List? ?? [];
+      return playlists.map((e) => YandexPlaylistResult.fromJson(e)).toList();
+    } catch (e) {
+      debugPrint('[YandexMusic] Get user playlists error: $e');
+      return [];
+    }
+  }
+
+  /// Get tracks in a playlist.
+  Future<List<YandexTrackResult>> getPlaylistTracks({
+    required String playlistUid,
+    required String playlistKind,
+  }) async {
+    if (!hasToken) return [];
+    try {
+      final response = await _dioGetWithRetry(
+        '$_baseUrl/users/$playlistUid/playlists/$playlistKind',
+      );
+      final result = response.data['result'];
+      if (result == null) return [];
+
+      final revision = result['revision']?.toString() ?? '0';
+      final tracks = result['tracks'] as List? ?? [];
+      final trackIds = tracks.map((t) => t['id']?.toString() ?? '').where((id) => id.isNotEmpty).toList();
+
+      if (trackIds.isEmpty) return [];
+
+      // Fetch track details in batches
+      final allTracks = <YandexTrackResult>[];
+      for (var i = 0; i < trackIds.length; i += 200) {
+        final batch = trackIds.sublist(i, (i + 200).clamp(0, trackIds.length));
+        final trackResponse = await _dio.post(
+          '$_baseUrl/tracks',
+          data: {'track-ids': batch},
+        );
+        final trackResult = trackResponse.data['result'];
+        if (trackResult != null) {
+          final trackList = trackResult as List? ?? [];
+          allTracks.addAll(trackList.map((e) => YandexTrackResult.fromJson(e)));
+        }
+      }
+
+      return allTracks;
+    } catch (e) {
+      debugPrint('[YandexMusic] Get playlist tracks error: $e');
+      return [];
+    }
+  }
+
+  /// Get "Моя волна" (My Wave) playlist from Yandex Music.
+  /// Tries multiple endpoints to find the wave playlist.
+  Future<YandexPlaylistResult?> getMyWavePlaylist() async {
+    if (!hasToken) return null;
+
+    // Try to get user playlists and find the wave
+    try {
+      final playlists = await getUserPlaylists();
+      for (final playlist in playlists) {
+        if (playlist.title.toLowerCase().contains('волна') ||
+            playlist.title.toLowerCase().contains('wave') ||
+            playlist.title.toLowerCase().contains('микс')) {
+          return playlist;
+        }
+      }
+    } catch (e) {
+      debugPrint('[YandexMusic] Get my wave from playlists error: $e');
+    }
+
+    return null;
+  }
+
+  /// Get radio tracks by artist from Yandex Music.
+  /// Tries similar artists + top tracks for radio, falls back to top tracks.
+  Future<List<YandexTrackResult>> getRadioByArtist({
+    required String artistId,
+    int count = 20,
+  }) async {
+    if (!hasToken) return [];
+    String yandexId = artistId;
+    try {
+      final resolved = await _resolveYandexArtistId(artistId);
+      if (resolved != null) yandexId = resolved;
+    } catch (_) {}
+    // 1) Try similar artists flow (best radio signal)
+    try {
+      final info = await getArtistInfo(yandexId);
+      if (info != null) {
+        final similar = info.similarArtists;
+        final pool = <YandexTrackResult>[];
+        try {
+          final own = await getArtistTopTracks(yandexId);
+          pool.addAll(own.take(5));
+        } catch (_) {}
+        for (final entry in similar.take(5)) {
+          try {
+            final simId = entry.id;
+            if (simId.isEmpty) continue;
+            final top = await getArtistTopTracks(simId);
+            pool.addAll(top.take(3));
+            if (pool.length >= count) break;
+            await Future.delayed(const Duration(milliseconds: 400));
+          } catch (_) {}
+        }
+        if (pool.length >= 5) {
+          pool.shuffle();
+          return pool.take(count).toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('[YandexMusic] Get radio by artist similar flow error: ');
+    }
+    // 2) Fallback to artist top tracks
+    try {
+      final tracks = await getArtistTopTracks(yandexId);
+      return tracks.take(count).toList();
+    } catch (e) {
+      debugPrint('[YandexMusic] Get radio by artist fallback error: ');
+    }
+    return [];
+  }
+
+  /// Search for tracks on Yandex Music by title + artist for matching with local library.
+  Future<YandexTrackResult?> searchTrackForMatch({
+    required String title,
+    required String artist,
+  }) async {
+    try {
+      final query = '$title $artist';
+      final response = await _dioGetWithRetry(
+        '$_baseUrl/search',
+        queryParameters: {
+          'text': query,
+          'type': 'track',
+          'page': 0,
+          'nococrrect': false,
+        },
+      );
+
+      final result = response.data['result'];
+      if (result == null) return null;
+
+      final tracksResult = result['tracks'];
+      if (tracksResult == null) return null;
+
+      final results = tracksResult['results'] as List? ?? [];
+      if (results.isEmpty) return null;
+
+      return YandexTrackResult.fromJson(results.first);
+    } catch (e) {
+      debugPrint('[YandexMusic] Search track for match error: $e');
+      return null;
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Image URL builders (NEW CDN format)
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /// Build image URL from Yandex Music coverUri.
+  /// Format: "avatars.yandex.net/get-music-content/{prefix}/{hash}.%%"
+  /// Replace %% with size like "200x200", "400x400", "600x600", "orig"
+  static String? getCoverUrl(String? coverUri, {String size = '200x200'}) {
+    if (coverUri == null || coverUri.isEmpty) return null;
+
+    // Clean up the URI
+    String uri = coverUri;
+    if (!uri.startsWith('http')) {
+      uri = 'https://$uri';
+    }
+
+    // Replace %% with size
+    return uri.replaceAll('%%', size);
+  }
+
+  /// Build artist cover URL from cover object.
+  static String? getArtistCoverUrl(Map<String, dynamic>? cover,
+      {String size = '200x200'}) {
+    if (cover == null) return null;
+
+    final uri = cover['uri'] as String?;
+    if (uri != null) {
+      return getCoverUrl(uri, size: size);
+    }
+
+    return null;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Matching with local library
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /// Find related content from Yandex Music that matches local library.
+  Future<List<RelatedAlbumMatch>> findRelatedAlbums({
+    required String artistName,
+    required List<Album> localAlbums,
+    int limit = 10,
+  }) async {
+    try {
+      final yandexAlbums = await searchAlbums(artistName);
+      final matches = <RelatedAlbumMatch>[];
+
+      for (final yandexAlbum in yandexAlbums) {
+        final match = _findBestAlbumMatch(yandexAlbum, localAlbums);
+        if (match != null) {
+          matches.add(RelatedAlbumMatch(
+            yandexAlbum: yandexAlbum,
+            localAlbum: match,
+            confidence: _calculateMatchConfidence(yandexAlbum, match),
+          ));
+        }
+        if (matches.length >= limit) break;
+      }
+
+      matches.sort((a, b) => b.confidence.compareTo(a.confidence));
+      return matches;
+    } catch (e) {
+      debugPrint('[YandexMusic] Find related albums error: $e');
+      return [];
+    }
+  }
+
+  /// Find related artists from Yandex Music that match local library.
+  Future<List<RelatedArtistMatch>> findRelatedArtists({
+    required String artistName,
+    required List<Artist> localArtists,
+    int limit = 10,
+  }) async {
+    try {
+      final yandexArtists = await searchArtists(artistName);
+      if (yandexArtists.isEmpty) return [];
+
+      final similarArtists = await getSimilarArtists(yandexArtists.first.id);
+      final matches = <RelatedArtistMatch>[];
+
+      for (final similarArtist in similarArtists) {
+        final match = _findBestArtistMatch(similarArtist, localArtists);
+        if (match != null) {
+          matches.add(RelatedArtistMatch(
+            yandexArtist: similarArtist,
+            localArtist: match,
+            confidence: _calculateArtistMatchConfidence(similarArtist, match),
+          ));
+        }
+        if (matches.length >= limit) break;
+      }
+
+      matches.sort((a, b) => b.confidence.compareTo(a.confidence));
+      return matches;
+    } catch (e) {
+      debugPrint('[YandexMusic] Find related artists error: $e');
+      return [];
+    }
+  }
+
+  /// Get enhanced recommendations by combining YM data with local library.
+  Future<YandexRecommendationResult> getEnhancedRecommendations({
+    required List<Song> localSongs,
+    required List<Artist> localArtists,
+    required List<Album> localAlbums,
+  }) async {
+    final result = YandexRecommendationResult();
+
+    try {
+      // Get landing page for general recommendations
+      final landing = await getLanding();
+      if (landing != null) {
+        result.landingBlocks = landing.blocks;
+      }
+
+      // Get similar artists for top local artists
+      final topArtists = localArtists.take(5).toList();
+      for (final artist in topArtists) {
+        final yandexResults = await searchArtists(artist.name);
+        if (yandexResults.isNotEmpty) {
+          final similar = await getSimilarArtists(yandexResults.first.id);
+          result.similarArtists[artist.id] = similar;
+        }
+      }
+
+      // Get derived colors for top albums
+      for (final album in localAlbums.take(10)) {
+        final yandexResults = await searchAlbums('${album.name} ${album.artist ?? ''}');
+        if (yandexResults.isNotEmpty && yandexResults.first.coverUri != null) {
+          result.albumColors[album.id] = YandexDerivedColors(
+            average: '#282828',
+            accent: '#1DB954',
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[YandexMusic] Enhanced recommendations error: $e');
+    }
+
+    return result;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Matching helpers
+  // ──────────────────────────────────────────────────────────────────────────
+
+  Album? _findBestAlbumMatch(YandexAlbumResult yandex, List<Album> local) {
+    final yandexTitle = yandex.title.toLowerCase().trim();
+    final yandexArtist = yandex.artistName?.toLowerCase().trim() ?? '';
+
+    Album? bestMatch;
+    double bestScore = 0;
+
+    for (final album in local) {
+      final localTitle = album.name.toLowerCase().trim();
+      final localArtist = album.artist?.toLowerCase().trim() ?? '';
+
+      double score = 0;
+
+      if (localTitle == yandexTitle) {
+        score += 0.6;
+      } else if (localTitle.contains(yandexTitle) ||
+          yandexTitle.contains(localTitle)) {
+        score += 0.4;
+      } else {
+        score += _fuzzyMatch(localTitle, yandexTitle) * 0.3;
+      }
+
+      if (yandexArtist.isNotEmpty && localArtist.isNotEmpty) {
+        if (localArtist == yandexArtist) {
+          score += 0.4;
+        } else if (localArtist.contains(yandexArtist) ||
+            yandexArtist.contains(localArtist)) {
+          score += 0.2;
+        } else {
+          score += _fuzzyMatch(localArtist, yandexArtist) * 0.15;
+        }
+      }
+
+      if (score > bestScore && score > 0.4) {
+        bestScore = score;
+        bestMatch = album;
+      }
+    }
+
+    return bestMatch;
+  }
+
+  Artist? _findBestArtistMatch(YandexArtistResult yandex, List<Artist> local) {
+    final yandexName = yandex.name.toLowerCase().trim();
+
+    Artist? bestMatch;
+    double bestScore = 0;
+
+    for (final artist in local) {
+      final localName = artist.name.toLowerCase().trim();
+
+      double score = 0;
+
+      if (localName == yandexName) {
+        score += 0.8;
+      } else if (localName.contains(yandexName) ||
+          yandexName.contains(localName)) {
+        score += 0.6;
+      } else {
+        score += _fuzzyMatch(localName, yandexName) * 0.4;
+      }
+
+      if (score > bestScore && score > 0.5) {
+        bestScore = score;
+        bestMatch = artist;
+      }
+    }
+
+    return bestMatch;
+  }
+
+  double _calculateMatchConfidence(YandexAlbumResult yandex, Album local) {
+    double confidence = 0.5;
+    if (yandex.coverUri != null) confidence += 0.1;
+    if (local.coverArt != null) confidence += 0.1;
+    if (yandex.year != null && local.year != null && yandex.year == local.year) {
+      confidence += 0.15;
+    }
+    if (yandex.genres?.isNotEmpty == true) confidence += 0.1;
+    return confidence.clamp(0.0, 1.0);
+  }
+
+  double _calculateArtistMatchConfidence(
+      YandexArtistResult yandex, Artist local) {
+    double confidence = 0.5;
+    if (yandex.coverUri != null) confidence += 0.15;
+    if (local.coverArt != null) confidence += 0.1;
+    if (yandex.genres?.isNotEmpty == true) confidence += 0.1;
+    if (yandex.tracksCount != null && yandex.tracksCount! > 0) {
+      confidence += 0.1;
+    }
+    return confidence.clamp(0.0, 1.0);
+  }
+
+  double _fuzzyMatch(String a, String b) {
+    if (a == b) return 1.0;
+    if (a.isEmpty || b.isEmpty) return 0.0;
+
+    final aLen = a.length;
+    final bLen = b.length;
+    final matrix = List.generate(
+      aLen + 1,
+      (i) => List.generate(bLen + 1, (j) => 0),
+    );
+
+    for (int i = 0; i <= aLen; i++) {
+      matrix[i][0] = i;
+    }
+    for (int j = 0; j <= bLen; j++) {
+      matrix[0][j] = j;
+    }
+
+    for (int i = 1; i <= aLen; i++) {
+      for (int j = 1; j <= bLen; j++) {
+        final cost = a[i - 1] == b[j - 1] ? 0 : 1;
+        matrix[i][j] = [
+          matrix[i - 1][j] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j - 1] + cost,
+        ].reduce((a, b) => a < b ? a : b);
+      }
+    }
+
+    final maxLen = aLen > bLen ? aLen : bLen;
+    return 1.0 - (matrix[aLen][bLen] / maxLen);
+  }
+
+  void dispose() {
+    _dio.close();
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Data models
+// ──────────────────────────────────────────────────────────────────────────
+
+class YandexArtistResult {
+  final String id;
+  final String name;
+  final String? coverUri;
+  final List<String>? genres;
+  final int? tracksCount;
+  final int? albumsCount;
+
+  // Extended data from brief-info
+  List<YandexArtistResult> similarArtists = [];
+  YandexDerivedColors? derivedColors;
+  List<YandexCoverSpec> allCovers = [];
+
+  YandexArtistResult({
+    required this.id,
+    required this.name,
+    this.coverUri,
+    this.genres,
+    this.tracksCount,
+    this.albumsCount,
+  });
+
+  factory YandexArtistResult.fromJson(Map<String, dynamic> json) {
+    // Handle cover as string or object
+    String? coverUri;
+    final cover = json['cover'];
+    if (cover is String) {
+      coverUri = cover;
+    } else if (cover is Map<String, dynamic>) {
+      coverUri = cover['uri'];
+    }
+
+    return YandexArtistResult(
+      id: json['id']?.toString() ?? '',
+      name: json['name'] ?? '',
+      coverUri: coverUri ?? json['ogImage'],
+      genres: (json['genres'] as List?)
+          ?.map((e) => e is String ? e : e['name']?.toString() ?? '')
+          .toList(),
+      tracksCount: json['counts']?['tracks'] ?? json['stats']?['tracks'],
+      albumsCount: json['counts']?['directAlbums'] ?? json['stats']?['albums'],
+    );
+  }
+
+  String? getSmallCoverUrl() =>
+      YandexMusicService.getCoverUrl(coverUri, size: '100x100');
+
+  String? getMediumCoverUrl() =>
+      YandexMusicService.getCoverUrl(coverUri, size: '200x200');
+
+  String? getLargeCoverUrl() =>
+      YandexMusicService.getCoverUrl(coverUri, size: '400x400');
+
+  String? getOrigCoverUrl() =>
+      YandexMusicService.getCoverUrl(coverUri, size: 'orig');
+}
+
+class YandexAlbumResult {
+  final String id;
+  final String title;
+  final String? artistName;
+  final String? artistId;
+  final String? coverUri;
+  final int? year;
+  final List<String>? genres;
+  final int? trackCount;
+
+  YandexAlbumResult({
+    required this.id,
+    required this.title,
+    this.artistName,
+    this.artistId,
+    this.coverUri,
+    this.year,
+    this.genres,
+    this.trackCount,
+  });
+
+  factory YandexAlbumResult.fromJson(Map<String, dynamic> json) {
+    return YandexAlbumResult(
+      id: json['id']?.toString() ?? '',
+      title: json['title'] ?? '',
+      artistName: json['artists']?.isNotEmpty == true
+          ? json['artists'][0]['name']
+          : json['artist']?['name'],
+      artistId: json['artists']?.isNotEmpty == true
+          ? json['artists'][0]['id']?.toString()
+          : json['artist']?['id']?.toString(),
+      coverUri: json['coverUri'] ?? json['ogImage'],
+      year: json['year'],
+      genres: (json['genres'] as List?)
+          ?.map((e) => e is String ? e : e['name']?.toString() ?? '')
+          .toList(),
+      trackCount: json['trackCount'] ?? json['veryImportant'],
+    );
+  }
+
+  String? getSmallCoverUrl() =>
+      YandexMusicService.getCoverUrl(coverUri, size: '100x100');
+
+  String? getMediumCoverUrl() =>
+      YandexMusicService.getCoverUrl(coverUri, size: '200x200');
+
+  String? getLargeCoverUrl() =>
+      YandexMusicService.getCoverUrl(coverUri, size: '400x400');
+}
+
+class YandexTrackResult {
+  final String id;
+  final String title;
+  final String? artistName;
+  final String? artistId;
+  final String? albumTitle;
+  final String? coverUri;
+  final int? durationMs;
+
+  YandexTrackResult({
+    required this.id,
+    required this.title,
+    this.artistName,
+    this.artistId,
+    this.albumTitle,
+    this.coverUri,
+    this.durationMs,
+  });
+
+  factory YandexTrackResult.fromJson(Map<String, dynamic> json) {
+    String? coverUri;
+    final albums = json['albums'] as List?;
+    if (albums != null && albums.isNotEmpty) {
+      coverUri = albums[0]['coverUri'];
+    }
+
+    return YandexTrackResult(
+      id: json['id']?.toString() ?? '',
+      title: json['title'] ?? '',
+      artistName: json['artists']?.isNotEmpty == true
+          ? json['artists'][0]['name']
+          : null,
+      artistId: json['artists']?.isNotEmpty == true
+          ? json['artists'][0]['id']?.toString()
+          : null,
+      albumTitle: albums?.isNotEmpty == true ? albums![0]['title'] : null,
+      coverUri: coverUri,
+      durationMs: json['durationMs'] ?? json['duration'],
+    );
+  }
+
+  String? getCoverUrl({String size = '200x200'}) =>
+      YandexMusicService.getCoverUrl(coverUri, size: size);
+}
+
+class YandexDerivedColors {
+  final String? average;
+  final String? waveText;
+  final String? miniPlayer;
+  final String? accent;
+
+  YandexDerivedColors({
+    this.average,
+    this.waveText,
+    this.miniPlayer,
+    this.accent,
+  });
+
+  factory YandexDerivedColors.fromJson(Map<String, dynamic> json) {
+    return YandexDerivedColors(
+      average: json['average'],
+      waveText: json['waveText'],
+      miniPlayer: json['miniPlayer'],
+      accent: json['accent'],
+    );
+  }
+
+  /// Convert hex string to Color (with # prefix).
+  int? get averageColor => _hexToColor(average);
+  int? get accentColor => _hexToColor(accent);
+  int? get miniPlayerColor => _hexToColor(miniPlayer);
+  int? get waveTextColor => _hexToColor(waveText);
+
+  static int? _hexToColor(String? hex) {
+    if (hex == null || hex.isEmpty) return null;
+    hex = hex.replaceFirst('#', '');
+    if (hex.length == 6) hex = 'FF$hex';
+    return int.tryParse(hex, radix: 16);
+  }
+}
+
+class YandexCoverSpec {
+  final String type;
+  final String? uri;
+  final String? prefix;
+
+  YandexCoverSpec({
+    required this.type,
+    this.uri,
+    this.prefix,
+  });
+
+  factory YandexCoverSpec.fromJson(Map<String, dynamic> json) {
+    return YandexCoverSpec(
+      type: json['type'] ?? '',
+      uri: json['uri'],
+      prefix: json['prefix'],
+    );
+  }
+
+  String? getUrl({String size = '200x200'}) =>
+      YandexMusicService.getCoverUrl(uri, size: size);
+}
+
+class YandexLandingResult {
+  final List<YandexLandingBlock> blocks;
+
+  YandexLandingResult({required this.blocks});
+
+  factory YandexLandingResult.fromJson(Map<String, dynamic> json) {
+    final blocks = <YandexLandingBlock>[];
+    final rawBlocks = json['blocks'] as List? ?? [];
+
+    for (final block in rawBlocks) {
+      blocks.add(YandexLandingBlock.fromJson(block));
+    }
+
+    return YandexLandingResult(blocks: blocks);
+  }
+}
+
+class YandexLandingBlock {
+  final String id;
+  final String type;
+  final String? title;
+  final List<YandexAlbumResult> albums;
+  final List<YandexArtistResult> artists;
+
+  YandexLandingBlock({
+    required this.id,
+    required this.type,
+    this.title,
+    required this.albums,
+    required this.artists,
+  });
+
+  factory YandexLandingBlock.empty() {
+    return YandexLandingBlock(
+      id: '',
+      type: '',
+      albums: [],
+      artists: [],
+    );
+  }
+
+  factory YandexLandingBlock.fromJson(Map<String, dynamic> json) {
+    final albums = <YandexAlbumResult>[];
+    final artists = <YandexArtistResult>[];
+
+    final rawEntities = json['entities'] as List? ?? [];
+    for (final entity in rawEntities) {
+      final data = entity['data'];
+      if (data == null) continue;
+
+      if (entity['type'] == 'album' || data.containsKey('title')) {
+        albums.add(YandexAlbumResult.fromJson(data));
+      } else if (entity['type'] == 'artist' || data.containsKey('name')) {
+        artists.add(YandexArtistResult.fromJson(data));
+      }
+    }
+
+    return YandexLandingBlock(
+      id: json['id']?.toString() ?? '',
+      type: json['type'] ?? '',
+      title: json['title'],
+      albums: albums,
+      artists: artists,
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Match result models
+// ──────────────────────────────────────────────────────────────────────────
+
+class RelatedAlbumMatch {
+  final YandexAlbumResult yandexAlbum;
+  final Album localAlbum;
+  final double confidence;
+
+  RelatedAlbumMatch({
+    required this.yandexAlbum,
+    required this.localAlbum,
+    required this.confidence,
+  });
+}
+
+class RelatedArtistMatch {
+  final YandexArtistResult yandexArtist;
+  final Artist localArtist;
+  final double confidence;
+
+  RelatedArtistMatch({
+    required this.yandexArtist,
+    required this.localArtist,
+    required this.confidence,
+  });
+}
+
+/// Enhanced recommendation result combining YM data with local library.
+class YandexRecommendationResult {
+  List<YandexLandingBlock> landingBlocks = [];
+  Map<String, List<YandexArtistResult>> similarArtists = {};
+  Map<String, YandexDerivedColors> albumColors = {};
+
+  YandexRecommendationResult();
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Image, Video, Lyrics models
+// ──────────────────────────────────────────────────────────────────────────
+
+class YandexImageResult {
+  final String url;
+  final String type;
+
+  YandexImageResult({
+    required this.url,
+    required this.type,
+  });
+}
+
+class YandexVideoResult {
+  final String title;
+  final String? thumbnailUrl;
+  final String? embedUrl;
+  final String? provider;
+  final String? providerVideoId;
+
+  YandexVideoResult({
+    required this.title,
+    this.thumbnailUrl,
+    this.embedUrl,
+    this.provider,
+    this.providerVideoId,
+  });
+
+  factory YandexVideoResult.fromJson(Map<String, dynamic> json) {
+    String? thumb;
+    final rawCover = json['cover'];
+    if (rawCover is String && rawCover.isNotEmpty) {
+      thumb = YandexMusicService.getCoverUrl(rawCover, size: '400x225') ?? rawCover;
+      if (thumb.contains('%%')) thumb = thumb.replaceAll('%%', '400x225');
+    } else if (rawCover is Map<String, dynamic>) {
+      final uri = rawCover['uri'] as String? ?? rawCover['url'] as String? ?? rawCover['ogImage'] as String?;
+      if (uri != null && uri.isNotEmpty) {
+        thumb = YandexMusicService.getCoverUrl(uri, size: '400x225') ?? uri;
+        if (thumb.contains('%%')) thumb = thumb.replaceAll('%%', '400x225');
+      }
+    }
+    thumb ??= json['ogImage'] as String? ?? json['thumbnail'] as String? ?? json['coverUri'] as String? ?? json['preview'] as String? ?? json['image'] as String?;
+    if (thumb != null) {
+      thumb = YandexMusicService.getCoverUrl(thumb, size: '400x225') ?? thumb;
+      if (thumb.contains('%%')) thumb = thumb.replaceAll('%%', '400x225');
+      if (!thumb.startsWith('http')) thumb = 'https://$thumb';
+    }
+    // YouTube fallback: если есть providerVideoId — строим youtube thumbnail
+    if ((thumb == null || thumb.isEmpty) && json['providerVideoId'] != null) {
+      final id = json['providerVideoId'].toString();
+      if (id.isNotEmpty) {
+        // Для youtube 11 символов, для yandex — тоже пробуем, иначе просто используем
+        if (RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(id)) {
+          thumb = 'https://img.youtube.com/vi/$id/hqdefault.jpg';
+        } else if (id.length > 5) {
+          // Попытка yandex thumb через avatars
+          thumb = 'https://img.youtube.com/vi/$id/hqdefault.jpg';
+        }
+      }
+    }
+    // Если всё ещё пусто и есть url embed youtube — вытянем id
+    if ((thumb == null || thumb.isEmpty) && json['embedUrl'] != null) {
+      final embed = json['embedUrl'].toString();
+      final m = RegExp(r'(?:youtu\.be/|youtube\.com/(?:embed/|watch\?v=))([a-zA-Z0-9_-]{11})').firstMatch(embed);
+      if (m != null) thumb = 'https://img.youtube.com/vi/${m.group(1)}/hqdefault.jpg';
+    }
+    String? embed = json['embedUrl'] as String? ?? json['url'] as String?;
+    return YandexVideoResult(
+      title: json['title'] ?? json['name'] ?? '',
+      thumbnailUrl: thumb,
+      embedUrl: embed,
+      provider: json['provider'],
+      providerVideoId: json['providerVideoId']?.toString() ?? json['id']?.toString(),
+    );
+  }
+}
+
+class YandexLyricsResult {
+  final String? text;
+  final List<YandexLyricsLine>? lines;
+
+  YandexLyricsResult({
+    this.text,
+    this.lines,
+  });
+
+  factory YandexLyricsResult.fromJson(Map<String, dynamic> json) {
+    final lyrics = json['lyrics'];
+    if (lyrics == null) return YandexLyricsResult();
+
+    final lines = <YandexLyricsLine>[];
+    final rawLines = lyrics['lines'] as List? ?? [];
+
+    for (final line in rawLines) {
+      lines.add(YandexLyricsLine.fromJson(line));
+    }
+
+    return YandexLyricsResult(
+      text: lyrics['text'],
+      lines: lines.isNotEmpty ? lines : null,
+    );
+  }
+}
+
+class YandexLyricsLine {
+  final double startTime;
+  final double endTime;
+  final String text;
+
+  YandexLyricsLine({
+    required this.startTime,
+    required this.endTime,
+    required this.text,
+  });
+
+  factory YandexLyricsLine.fromJson(Map<String, dynamic> json) {
+    return YandexLyricsLine(
+      startTime: (json['startTime'] ?? 0).toDouble(),
+      endTime: (json['endTime'] ?? 0).toDouble(),
+      text: json['text'] ?? '',
+    );
+  }
+}
+
+class YandexPlaylistResult {
+  final String uid;
+  final String kind;
+  final String title;
+  final String? description;
+  final int trackCount;
+  final String? coverUrl;
+  final bool isOwn;
+
+  YandexPlaylistResult({
+    required this.uid,
+    required this.kind,
+    required this.title,
+    this.description,
+    this.trackCount = 0,
+    this.coverUrl,
+    this.isOwn = false,
+  });
+
+  factory YandexPlaylistResult.fromJson(Map<String, dynamic> json) {
+    String? coverUrl;
+    final cover = json['cover'];
+    if (cover is Map<String, dynamic>) {
+      final uri = cover['uri'] as String?;
+      if (uri != null) {
+        coverUrl = YandexMusicService.getCoverUrl(uri, size: '200x200');
+      }
+    }
+
+    return YandexPlaylistResult(
+      uid: json['uid']?.toString() ?? '',
+      kind: json['kind']?.toString() ?? '',
+      title: json['title'] ?? json['name'] ?? 'Untitled',
+      description: json['description'] as String?,
+      trackCount: json['trackCount'] as int? ?? 0,
+      coverUrl: coverUrl,
+      isOwn: json['isOwn'] as bool? ?? false,
+    );
+  }
+}
+

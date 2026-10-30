@@ -1,0 +1,330 @@
+/* ── Community ──────────────────────────────────────── */
+.community {
+    background: linear-gradient(180deg, transparent 0%, rgba(255,45,85,0.025) 60%, transparent 100%);
+}
+
+.com-header {
+    text-align: center;
+    margin-bottom: 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.com-title {
+    font-size: clamp(2rem, 4vw, 2.75rem);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+}
+
+.com-subtitle {
+    font-size: 17px;
+    color: var(--t2);
+    max-width: 480px;
+}
+
+/* Grid */
+.com-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+/* Card */
+.com-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: background 0.28s, border-color 0.28s, transform 0.28s;
+}
+
+.com-card:hover {
+    background: var(--bg-card-h);
+    border-color: var(--border-h);
+    transform: translateY(-4px);
+}
+
+.com-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.com-card-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.com-card-title {
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--t1);
+    letter-spacing: -0.01em;
+}
+
+.com-card-desc {
+    font-size: 14px;
+    color: var(--t2);
+    line-height: 1.7;
+    flex: 1;
+}
+
+/* Crypto table */
+.com-crypto {
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+}
+
+.com-crypto-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.com-crypto-table th {
+    text-align: left;
+    color: var(--t3);
+    font-weight: 600;
+    padding: 4px 6px 8px;
+    border-bottom: 1px solid var(--border);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-size: 11px;
+}
+
+.com-crypto-table td {
+    padding: 7px 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    vertical-align: middle;
+}
+
+.com-crypto-table tr:last-child td {
+    border-bottom: none;
+}
+
+.com-crypto-network {
+    color: var(--t2);
+    font-weight: 600;
+    white-space: nowrap;
+    padding-right: 12px !important;
+}
+
+.com-crypto-addr {
+    font-family: 'SF Mono', ui-monospace, monospace;
+    font-size: 10.5px;
+    color: var(--t2);
+    background: rgba(255,255,255,0.06);
+    padding: 3px 7px;
+    border-radius: 6px;
+    display: block;
+    word-break: break-all;
+    line-height: 1.6;
+    user-select: all;
+}
+
+/* Actions */
+.com-card-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.com-btn {
+    justify-content: center;
+    font-size: 14px;
+    padding: 11px 20px;
+}
+
+.com-btn--discord {
+    background: #5865f2;
+    color: white;
+    box-shadow: 0 4px 20px rgba(88, 101, 242, 0.4);
+}
+
+.com-btn--discord:hover {
+    background: #4752c4;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(88, 101, 242, 0.5);
+}
+
+.com-btn--coffee {
+    background: linear-gradient(135deg, #ffdd00, #ff9500);
+    color: #000;
+    font-weight: 700;
+    box-shadow: 0 4px 20px rgba(255, 165, 0, 0.35);
+}
+
+.com-btn--coffee:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(255, 165, 0, 0.5);
+}
+
+.com-btn--github {
+    background: rgba(255,255,255,0.08);
+    color: var(--t1);
+    border: 1px solid var(--border);
+}
+
+.com-btn--github:hover {
+    background: rgba(255,255,255,0.13);
+    border-color: var(--border-h);
+    transform: translateY(-2px);
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+    .com-grid {
+        grid-template-columns: 1fr;
+        max-width: 520px;
+        margin: 0 auto;
+    }
+}
+
+    font-size: var(--font-size-lg);
+    color: var(--color-text-secondary);
+}
+
+/* Cards */
+.community-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-lg);
+}
+
+.community-card {
+    padding: var(--spacing-2xl);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    height: 100%;
+}
+
+.community-card-icon {
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-lg);
+}
+
+.discord-icon {
+    background: linear-gradient(135deg, #5865F2 0%, #7289DA 100%);
+}
+
+.support-icon {
+    background: linear-gradient(135deg, #FFDD00 0%, #FFA500 100%);
+    color: #000;
+}
+
+.contribute-icon {
+    background: var(--gradient-primary);
+}
+
+.community-card-title {
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+}
+
+.community-card-description {
+    font-size: var(--font-size-base);
+    color: var(--color-text-secondary);
+    line-height: 1.7;
+    flex: 1;
+}
+
+/* Discord Button */
+.btn-discord {
+    background: linear-gradient(135deg, #5865F2 0%, #7289DA 100%);
+    color: white;
+    padding: var(--spacing-md) var(--spacing-xl);
+    border-radius: var(--radius-lg);
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    transition: all var(--transition-normal);
+    width: fit-content;
+}
+
+.btn-discord:hover {
+    box-shadow: 0 0 30px rgba(88, 101, 242, 0.4);
+}
+
+/* Coffee Button */
+.btn-coffee {
+    background: linear-gradient(135deg, #FFDD00 0%, #FFA500 100%);
+    color: #000;
+    padding: var(--spacing-md) var(--spacing-xl);
+    border-radius: var(--radius-lg);
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    transition: all var(--transition-normal);
+    width: fit-content;
+}
+
+.btn-coffee:hover {
+    box-shadow: 0 0 30px rgba(255, 165, 0, 0.4);
+}
+
+.community-support-buttons {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+/* Crypto */
+.community-crypto {
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--color-border);
+}
+
+.community-crypto-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-tertiary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.community-crypto-options {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+.crypto-option {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.crypto-sol {
+    font-size: var(--font-size-lg);
+    color: #9945FF;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .community-cards {
+        grid-template-columns: 1fr;
+        max-width: 500px;
+        margin: 0 auto;
+    }
+}

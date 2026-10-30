@@ -1,0 +1,22 @@
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "D:/newKumaflow/icons/icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#1C1C1E"
+  adaptive_icon_foreground: "D:/newKumaflow/icons/icon.png"
+
+  web:
+    generate: true
+    image_path: "D:/newKumaflow/icons/icon.png"
+    background_color: "#1C1C1E"
+    theme_color: "#FF6B00"
+
+  windows:
+    generate: true
+    image_path: "D:/newKumaflow/icons/icon.png"
+    icon_size: 48
+
+  macos:
+    generate: true
+    image_path: "D:/newKumaflow/icons/icon.png"
