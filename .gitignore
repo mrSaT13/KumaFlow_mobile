@@ -5,8 +5,10 @@ __СОХРАНИТЬ_ЛОКАЛЬНО/
 # Code backups (never commit)
 *.bak
 *.bak_*
-*.goodbak*
-*.mojifix
+*.bak*
+*goodbak*
+*mojifix*
+*_backup_*
 backup_*/
 backup_*
 _backup_*/
