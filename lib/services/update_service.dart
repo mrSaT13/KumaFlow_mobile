@@ -32,7 +32,7 @@ class ReleaseInfo {
 
   factory ReleaseInfo.fromJson(Map<String, dynamic> json) {
     final tag = json['tag_name'] as String? ?? '';
-    // Теги вида MC_3.6.1+28 / v3.6.1: вытаскиваем числовую версию.
+    // Теги мобилы: v3.7.x — вытаскиваем числовую версию.
     final m = RegExp(r'(\d+)\.(\d+)\.(\d+)').firstMatch(tag);
     final version = m != null
         ? '${m.group(1)}.${m.group(2)}.${m.group(3)}'
@@ -84,7 +84,7 @@ class UpdateService {
   static String get currentVersion => _currentVersion;
 
   static const String _apiUrl =
-      'https://api.github.com/repos/mrSaT13/kumaflow/releases?per_page=30';
+      'https://api.github.com/repos/mrSaT13/KumaFlow_mobile/releases?per_page=30';
 
   static final _dio = Dio(
     BaseOptions(
@@ -111,18 +111,17 @@ class UpdateService {
       final items = response.data;
       if (items == null || items.isEmpty) return null;
 
-      // В одном репозитории живут оба плеера: десктопные v-теги и
-      // мобильные MC_. Берём свежий релиз с мобильным тегом — общий
-      // /releases/latest после десктопного релиза показывал бы v1.14.0,
-      // и сравнение 1.14.0 < 3.7.x вечно говорило бы «нового нет».
+      // Отдельный репозиторий мобилы: берём свежий стабильный релиз
+      // (не draft, не prerelease). Теги v3.7.x парсит ReleaseInfo.fromJson.
       Map<String, dynamic>? mobile;
       for (final raw in items) {
         if (raw is! Map<String, dynamic>) continue;
-        final tag = (raw['tag_name'] as String? ?? '').toUpperCase();
-        if (tag.startsWith('MC_')) {
-          mobile = raw;
-          break;
-        }
+        if (raw['draft'] == true) continue;
+        if (raw['prerelease'] == true) continue;
+        final tag = (raw['tag_name'] as String? ?? '').trim();
+        if (tag.isEmpty) continue;
+        mobile = raw;
+        break;
       }
       if (mobile == null) return null;
 
