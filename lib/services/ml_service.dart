@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/song.dart';
+import '../models/ml/ml_types.dart';
 import 'bpm_analyzer_service.dart';
 import 'yandex_enrichment_service.dart';
 import 'library_database_service.dart';
@@ -980,46 +981,227 @@ class MLService extends ChangeNotifier {
    List<Song> generateLocalMyWave({required List<Song> songs, int count = 30}) {
       final filtered = filterSongs(songs);
       if (filtered.isEmpty) return [];
-      // Shuffle before scoring to break deterministic ties when scores are equal
-      filtered.shuffle(_random);
-      final sorted = scoreAndSort(filtered);
-      if (sorted.length <= count) return sorted..shuffle(_random);
+      if (filtered.length <= count) return filtered..shuffle(_random);
+
+      final now = DateTime.now();
+      final nowMs = now.millisecondsSinceEpoch;
+      final hour = now.hour;
+      double targetEnergy;
+      if (hour >= 6 && hour < 12) {
+        targetEnergy = 0.45;
+      } else if (hour >= 12 && hour < 18) {
+        targetEnergy = 0.6;
+      } else if (hour >= 18 && hour < 24) {
+        targetEnergy = 0.7;
+      } else {
+        targetEnergy = 0.35;
+      }
+      final vibe = VibeSimilarity();
+
+      double baseScore(Song s) {
+        double sc = calculateTrackScore(s.id);
+        final r = _ratings[s.id];
+        if (s.artistId != null) {
+          sc += (_profile.preferredArtists[s.artistId] ?? 0) * 6;
+        } else if (s.artist != null) {
+          sc += (_profile.preferredArtists[s.artist!] ?? 0) * 2.5;
+        }
+        final effGenre = _effectiveGenre(s);
+        if (effGenre != null) {
+          sc += (_profile.preferredGenres[effGenre] ?? 0) * 3;
+        }
+        if (r == null || (r.playCount == 0 && r.score == 0)) {
+          sc += 8;
+        } else {
+          final fatigue = ((r.playCount - 5).clamp(0, 10)) * 1.5;
+          sc -= fatigue;
+        }
+        final lastPlayed = r?.lastPlayed;
+        if (lastPlayed != null) {
+          final hours = (nowMs - lastPlayed.millisecondsSinceEpoch) / 3600000;
+          if (hours < 6) {
+            sc -= 40;
+          } else if (hours < 24) {
+            sc -= 25;
+          } else if (hours < 72) {
+            sc -= 10;
+          } else if (hours < 168) {
+            sc -= 4;
+          }
+        }
+        final lastSkip = r?.lastSkipTime;
+        if (lastSkip != null) {
+          final skipHours =
+              (nowMs - lastSkip.millisecondsSinceEpoch) / 3600000;
+          if (skipHours < 24) sc -= 30;
+        } else if ((r?.skipCount ?? 0) > 1) {
+          sc -= (r!.skipCount * 4).clamp(0, 20).toDouble();
+        }
+        try {
+          final f = vibe.analyzeTrack(s);
+          final d = (f.energy - targetEnergy).abs().clamp(0.0, 1.0);
+          sc += (1.0 - d) * 6;
+        } catch (_) {}
+        return sc;
+      }
+
+      const temp = 14.0;
+      final scored = filtered.map((s) => MapEntry(s, baseScore(s))).toList();
+      double maxSc = scored.first.value;
+      for (final e in scored) {
+        if (e.value > maxSc) maxSc = e.value;
+      }
+      final pool = scored.map((e) {
+        final w = exp((e.value - maxSc) / temp) + 0.25;
+        return MapEntry(e.key, w);
+      }).toList();
 
       final result = <Song>[];
-      // Reduced anchor to 20% so wave actually changes on refresh (was 40%).
-      final topCount = (count * 0.2).round().clamp(3, 8);
-      // Pick anchor from top 25% with weighted randomness, not strictly top N
-      final anchorPool = sorted.take((sorted.length * 0.25).ceil()).toList();
-      anchorPool.shuffle(_random);
-      // Score anchor pool slightly so higher-scored still preferred but not guaranteed
-      final anchorScored = anchorPool.map((s) {
-        double sc = calculateTrackScore(s.id);
-        sc += _random.nextDouble() * 4;
-        return MapEntry(s, sc);
-      }).toList()
-        ..sort((a, b) => b.value.compareTo(a.value));
-      result.addAll(anchorScored.take(topCount).map((e) => e.key));
+      final perArtist = <String, int>{};
+      final perGenre = <String, int>{};
+      final maxPerArtist = count >= 20 ? 3 : 2;
 
-      // Rotate the rest with shuffled draw + recency penalty
-      final remaining = sorted.where((s) => !result.contains(s)).toList();
-      final now = DateTime.now().millisecondsSinceEpoch;
-      final weighted = remaining.map((s) {
-        double score = calculateTrackScore(s.id);
-        final lastPlayed = ratings[s.id]?.lastPlayed;
-        if (lastPlayed != null) {
-          final lastMs = lastPlayed.millisecondsSinceEpoch;
-          final hours = (now - lastMs) / 3600000;
-          score -= (1.0 / (1.0 + hours / 24.0)) * 3;
+      while (result.length < count && pool.isNotEmpty) {
+        double total = 0;
+        for (final e in pool) {
+          total += e.value;
         }
-        score += _random.nextDouble() * 10;
-        return MapEntry(s, score);
-      }).toList();
-      weighted.sort((a, b) => b.value.compareTo(a.value));
-
-      result.addAll(weighted.take(count - result.length).map((e) => e.key));
-      // Shuffle the whole result so cover and order vary each refresh
+        double roll = _random.nextDouble() * total;
+        int pick = 0;
+        for (int i = 0; i < pool.length; i++) {
+          roll -= pool[i].value;
+          if (roll <= 0) {
+            pick = i;
+            break;
+          }
+        }
+        final song = pool.removeAt(pick).key;
+        final aKey =
+            (song.artistId ?? song.artist ?? '').trim().toLowerCase();
+        final gKey = (_effectiveGenre(song) ?? '').trim().toLowerCase();
+        if (aKey.isNotEmpty &&
+            (perArtist[aKey] ?? 0) >= maxPerArtist &&
+            pool.length > count) {
+          continue;
+        }
+        if (gKey.isNotEmpty &&
+            (perGenre[gKey] ?? 0) >= (count / 3).ceil() &&
+            pool.length > count) {
+          continue;
+        }
+        perArtist[aKey] = (perArtist[aKey] ?? 0) + 1;
+        if (gKey.isNotEmpty) perGenre[gKey] = (perGenre[gKey] ?? 0) + 1;
+        result.add(song);
+      }
+      if (result.length < count) {
+        final seen = result.toSet();
+        for (final s in filtered) {
+          if (result.length >= count) break;
+          if (!seen.contains(s)) result.add(s);
+        }
+      }
       result.shuffle(_random);
       return result;
+    }
+
+    /// Локальный микс по треку-сиду (полностью офлайн).
+    /// Возвращает похожие БЕЗ сида (сид caller подставляет первым сам).
+   List<Song> generateLocalMixByTrack({
+      required Song seed,
+      required List<Song> pool,
+      int count = 10,
+    }) {
+      final filtered =
+          pool.where((s) => s.id != seed.id && !isDisliked(s.id)).toList();
+      if (filtered.isEmpty) return [];
+      final vibe = VibeSimilarity();
+      VibeFeatures? seedF;
+      try {
+        seedF = vibe.analyzeTrack(seed);
+      } catch (_) {}
+      final seedArtist = (seed.artist ?? '').trim().toLowerCase();
+      final seedGenre = (_effectiveGenre(seed) ?? '').trim().toLowerCase();
+
+      final scored = filtered.map((s) {
+        double sc = 0;
+        final a = (s.artist ?? '').trim().toLowerCase();
+        final g = (_effectiveGenre(s) ?? '').trim().toLowerCase();
+        if (seedArtist.isNotEmpty && a == seedArtist) sc += 30;
+        if (seedGenre.isNotEmpty && g == seedGenre) {
+          sc += 15;
+        } else if (seedGenre.isNotEmpty &&
+            g.isNotEmpty &&
+            (g.contains(seedGenre) || seedGenre.contains(g))) {
+          sc += 8;
+        }
+        if (seedF != null) {
+          try {
+            final f = vibe.analyzeTrack(s);
+            final dEnergy = (f.energy - seedF.energy).abs();
+            final dVal = (f.valence - seedF.valence).abs();
+            final dBpm = ((f.bpm - seedF.bpm).abs() / 60.0).clamp(0.0, 1.0);
+            sc += (1.0 - dEnergy) * 10 + (1.0 - dVal) * 5 + (1.0 - dBpm) * 4;
+          } catch (_) {}
+        }
+        sc += (calculateTrackScore(s.id) / 10.0).clamp(-5.0, 10.0);
+        final r = _ratings[s.id];
+        if (r?.lastPlayed != null) {
+          final hours = (DateTime.now().millisecondsSinceEpoch -
+                  r!.lastPlayed!.millisecondsSinceEpoch) /
+              3600000;
+          if (hours < 12) sc -= 20;
+        }
+        sc += _random.nextDouble() * 8;
+        return MapEntry(s, sc);
+      }).toList();
+      scored.sort((a, b) => b.value.compareTo(a.value));
+      final out = <Song>[];
+      final perArtist = <String, int>{};
+      for (final e in scored) {
+        if (out.length >= count) break;
+        final a = (e.key.artist ?? '').trim().toLowerCase();
+        if (a.isNotEmpty && a != seedArtist && (perArtist[a] ?? 0) >= 3) {
+          continue;
+        }
+        perArtist[a] = (perArtist[a] ?? 0) + 1;
+        out.add(e.key);
+      }
+      return out;
+    }
+
+    /// Локальная волна по артисту: его треки + похожие по жанру/вайбу.
+   List<Song> generateLocalArtistWave({
+      required String artistName,
+      required List<Song> pool,
+      int count = 25,
+    }) {
+      final trimmed = artistName.trim().toLowerCase();
+      if (trimmed.isEmpty || pool.isEmpty) return [];
+      final own = pool
+          .where((s) =>
+              (s.artist ?? '').trim().toLowerCase() == trimmed &&
+              !isDisliked(s.id))
+          .toList()
+        ..shuffle(_random);
+      if (own.length >= count) return own.take(count).toList();
+      Song seed;
+      if (own.isNotEmpty) {
+        seed = own.first;
+      } else {
+        try {
+          seed = pool.firstWhere(
+            (s) => (s.artist ?? '').trim().toLowerCase() == trimmed,
+          );
+        } catch (_) {
+          seed = pool.first;
+        }
+      }
+      final rest = generateLocalMixByTrack(
+        seed: seed,
+        pool: pool.where((s) => !own.contains(s)).toList(),
+        count: count - own.length,
+      );
+      return [...own, ...rest];
     }
 
   // ─── Persistence ──────────────────────────────────────────────────

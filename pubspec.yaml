@@ -1,7 +1,7 @@
 name: kumaflow
 description: "KumaFlow - Music Streaming Player"
 publish_to: 'none'
-version: 3.7.56+2086
+version: 3.7.57+2087
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

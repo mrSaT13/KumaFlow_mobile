@@ -1731,6 +1731,47 @@ final bannedArtists = MLService().profile.bannedArtists.toSet();
       sourceIndex = (sourceIndex + 1) % sources.length;
     }
 
+    // Локальный фолбэк: сервер без Last.fm / офлайн отдал пусто —
+    // строим микс из доступной библиотеки по артисту/жанру/вайбу.
+    // Чинит все точки (InstantMix-диалог, NowPlaying, офлайн-экран, KFN).
+    if (results.length <= 1 && availableSongs != null && availableSongs.isNotEmpty) {
+      try {
+        final ml = MLService();
+        final bannedArtists = ml.profile.bannedArtists.toSet();
+        final bannedNames = ml.profile.bannedArtistNames.values
+            .map((n) => n.toLowerCase())
+            .toSet();
+        final pool = availableSongs.where((s) {
+          if (excludeIds.contains(s.id) || excludeIds.contains(s.queueKey)) {
+            return false;
+          }
+          if (ml.isDisliked(s.id)) return false;
+          if (s.artistId != null && bannedArtists.contains(s.artistId)) {
+            return false;
+          }
+          if (s.artist != null &&
+              bannedNames.contains(s.artist!.toLowerCase())) {
+            return false;
+          }
+          if (recentIds.contains(s.id)) return false;
+          return true;
+        }).toList();
+        final local = ml.generateLocalMixByTrack(
+          seed: seedSong,
+          pool: pool,
+          count: count,
+        );
+        for (final s in local) {
+          if (results.length > count) break;
+          if (excludeIds.contains(s.id)) continue;
+          excludeIds.add(s.id);
+          results.add(s);
+        }
+      } catch (e) {
+        debugPrint('[AutoDj] local mix fallback failed: $e');
+      }
+    }
+
     // Apply mood filter
     if (mood != null) {
       final moodFiltered = applyMoodFilter(results.sublist(1), mood);

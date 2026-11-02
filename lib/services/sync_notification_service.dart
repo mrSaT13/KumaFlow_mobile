@@ -28,6 +28,7 @@ class SyncNotificationService {
   static const String _downloadChannelId = 'kumaflow_download';
   static const int _syncNotifId = 1001;
   static const int _downloadNotifId = 1002;
+  static const int _singleNotifId = 1003;
 
   DateTime _lastSyncPush = DateTime.fromMillisecondsSinceEpoch(0);
   int _lastSyncPct = -1;
@@ -38,6 +39,12 @@ class SyncNotificationService {
   int _lastDownloadPct = -1;
   int _lastDownloadDone = -1;
   bool _downloadVisible = false;
+  bool _singleVisible = false;
+  DateTime _lastSinglePush = DateTime.fromMillisecondsSinceEpoch(0);
+  int _lastSinglePct = -1;
+  int _lastSingleCount = -1;
+  String _lastSingleTitle = '';
+  VoidCallback? _singleListener;
   bool _attached = false;
   VoidCallback? _syncListener;
   VoidCallback? _downloadListener;
@@ -113,6 +120,9 @@ class SyncNotificationService {
     _downloadListener = () => _onDownload(offline);
     lib.addListener(_syncListener!);
     offline.downloadState.addListener(_downloadListener!);
+    // Одиночные треки (вне батча): прогресс по каждому чанку.
+    _singleListener = () => _onSingle(offline);
+    offline.addListener(_singleListener!);
   }
 
   /// Отписка — чтобы не было дублей при повторном attach.
@@ -124,6 +134,12 @@ class SyncNotificationService {
       try {
         _attachedOffline!.downloadState.removeListener(_downloadListener!);
       } catch (_) {}
+    }
+    if (_singleListener != null && _attachedOffline != null) {
+      try {
+        _attachedOffline!.removeListener(_singleListener!);
+      } catch (_) {}
+      _singleListener = null;
     }
     _syncListener = null;
     _downloadListener = null;
@@ -318,6 +334,70 @@ class SyncNotificationService {
       body: total > 0 ? '$done / $total' : 'Подготовка...',
       done: done,
       total: total,
+    );
+  }
+
+  /// Одиночные треки вне батча (тап «скачать» на треке/альбоме).
+  /// Батч идёт — его нотификация главная, одиночную прячем.
+  void _onSingle(OfflineService offline) {
+    if (offline.downloadState.value.isDownloading) {
+      if (_singleVisible) {
+        _singleVisible = false;
+        _lastSinglePct = -1;
+        _lastSingleCount = -1;
+        _lastSingleTitle = '';
+        _cancel(_singleNotifId);
+      }
+      return;
+    }
+    String title = '';
+    double sum = 0;
+    int n = 0;
+    try {
+      offline.downloadProgress.forEach((id, p) {
+        if (p.isComplete || p.isError || p.progress >= 1) return;
+        n++;
+        sum += p.progress.clamp(0.0, 1.0);
+        if (title.isEmpty) title = offline.downloadTitles[id] ?? '';
+      });
+    } catch (_) {}
+    if (n == 0) {
+      if (!_singleVisible) return;
+      _singleVisible = false;
+      _lastSinglePct = -1;
+      _lastSingleCount = -1;
+      _lastSingleTitle = '';
+      _cancel(_singleNotifId);
+      return;
+    }
+    final pct = ((sum / n) * 100).round().clamp(0, 100);
+    final body = title.isNotEmpty
+        ? (n > 1 ? '$title (+${n - 1})' : title)
+        : 'Треков: $n';
+    final titleChanged = title != _lastSingleTitle;
+    if (!titleChanged &&
+        !_throttleOk(
+          _lastSinglePush,
+          pct,
+          _lastSinglePct,
+          n,
+          _lastSingleCount,
+        )) {
+      return;
+    }
+    _lastSinglePush = DateTime.now();
+    _lastSinglePct = pct;
+    _lastSingleCount = n;
+    _lastSingleTitle = title;
+    _singleVisible = true;
+    _showProgress(
+      id: _singleNotifId,
+      channelId: _downloadChannelId,
+      channelName: 'Скачивание музыки',
+      title: 'Скачивание трека',
+      body: body,
+      done: pct,
+      total: 100,
     );
   }
 }

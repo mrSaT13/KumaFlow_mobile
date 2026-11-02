@@ -17,6 +17,7 @@ import '../services/kumaflow_brain/kumaflow_brain_options.dart';
 import '../services/kumaflow_brain/kumaflow_brain_settings.dart';
 import '../services/kumaflow_brain/kumaflow_brain_wave_resolver.dart';
 import '../services/recommendation_service.dart';
+import '../services/shared_mixes_loader.dart';
 import '../services/storage_service.dart';
 import '../services/theme_service.dart';
 import '../services/yandex_music_service.dart';
@@ -595,6 +596,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         setState(() => _cachedPersonalized = feed);
                       });
                       // Миксы — только когда синк не пишет в БД.
+                      // Единый лоадер (SharedMixesLoader): тот же ключ/пул что
+                      // у экрана Миксов + single-flight — изолят считается
+                      // один раз на оба экрана, второй читает кэш/ждёт Future.
                       Future(() async {
                         for (var i = 0; i < 90; i++) {
                           if (!mounted || _lastRandomKey != waveKey) return;
@@ -605,14 +609,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         if (libRef.isSyncing) return;
                         final freshPool = await libRef.getPoolForMix(limit: 700);
                         final pool = freshPool.length >= 15 ? freshPool : poolForMixes;
-                        final mixes = pool.length >= 400
-                            ? await recRef.generateMixesIsolated(pool)
-                            : await recRef.generateMixes(pool);
+                        final mixes = await SharedMixesLoader().getAllMixes(
+                          pool: pool,
+                          bannedKey: recRef.bannedArtistsKey,
+                          rec: recRef,
+                        );
                         if (!mounted || _lastRandomKey != waveKey) return;
+                        if (mixes.isEmpty) return;
                         setState(() => _cachedMixes = mixes);
-                        try {
-                          await MixCacheService().saveAllMixes(waveKey, mixes);
-                        } catch (_) {}
                       });
                       });
                     });
@@ -3567,7 +3571,7 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
       if (tracks.isEmpty) return null;
       final resolved = await KumaFlowBrainWaveResolver(subsonic)
           .resolve(tracks, maxTracks: 55)
-          .timeout(const Duration(seconds: 90));
+          .timeout(const Duration(seconds: 30));
       if (resolved.missing.isNotEmpty) {
         bridge.noteMissing(resolved.missing.map((t) =>
             (t.externalId != null && t.externalId!.isNotEmpty)
@@ -3595,8 +3599,9 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
       // Даём спиннеру отрисоваться; тяжёлый скоринг — в следующем кадре.
       await Future.delayed(const Duration(milliseconds: 60));
       await _persistSelection();
-      // Пилюли — общие для всех устройств: пушим на мозг best-effort
-      // (не ждём — волна строится параллельно, снэк покажет итог).
+      // Пилюли — общие для всех устройств: пушим на мозг ПЕРЕД waveContinue
+      // (раньше было unawaited параллельно — первая генерация уходила со
+      // старыми пилюлями, вторая уже видела новые и "добиралась").
       try {
         final languageStrict = brainSettings?.languageStrict ?? false;
         final shared = <String, dynamic>{
@@ -3609,12 +3614,21 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
             'language': normalizeBrainLanguage(_lang),
           if (languageStrict) 'language_strict': true,
         };
-        unawaited(bridgeRef.pushSharedWaveSettings(shared));
+        await bridgeRef
+            .pushSharedWaveSettings(shared)
+            .timeout(const Duration(seconds: 4), onTimeout: () => false);
       } catch (_) {}
       if (!mounted) return;
       // Сервер выбран (мост KumaFlow Brain активен) — запрос уходит в KumaFlow Brain,
       // а не считается локально. null = мост выкл/ошибка -> локальный путь.
-      final brainSongs = await _buildKumaFlowBrainWave();
+      var brainSongs = await _buildKumaFlowBrainWave();
+      // Холодный старт мозга: первый waveContinue может вернуть пусто пока
+      // сервер прогревается — ретраим один раз вместо "не генерирует".
+      if (brainSongs == null && bridgeRef.isActive && mounted) {
+        await Future.delayed(const Duration(milliseconds: 1500));
+        if (!mounted) return;
+        brainSongs = await _buildKumaFlowBrainWave();
+      }
       if (!mounted) return;
       if (brainSongs != null) {
         final hint = _hintLine;

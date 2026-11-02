@@ -134,6 +134,18 @@ class AppTheme {
           type: BottomNavigationBarType.fixed,
           elevation: 0,
         ),
+        snackBarTheme: SnackBarThemeData(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF1E1E1E),
+          contentTextStyle:
+              const TextStyle(fontSize: 14, color: Colors.white),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16)),
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          elevation: 8,
+          showCloseIcon: false,
+        ),
         cupertinoOverrideTheme: CupertinoThemeData(
           primaryColor: accent,
         ),
@@ -229,6 +241,18 @@ final bg = amoled ? const Color(0xFF000000) : darkBackground;
           type: BottomNavigationBarType.fixed,
           elevation: 0,
         ),
+        snackBarTheme: SnackBarThemeData(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFF282828),
+          contentTextStyle:
+              const TextStyle(fontSize: 14, color: Colors.white),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16)),
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          elevation: 8,
+          showCloseIcon: false,
+        ),
         cupertinoOverrideTheme: CupertinoThemeData(
           primaryColor: accent,
           brightness: Brightness.dark,
@@ -307,6 +331,19 @@ final bg = amoled ? const Color(0xFF000000) : darkBackground;
         unselectedItemColor: secondary,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor:
+            isDark ? const Color(0xFF282828) : const Color(0xFF1E1E1E),
+        contentTextStyle: TextStyle(
+            fontSize: 14, color: isDark ? Colors.white : Colors.white),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        elevation: 8,
+        showCloseIcon: false,
       ),
       cupertinoOverrideTheme: CupertinoThemeData(
         primaryColor: accent,

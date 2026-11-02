@@ -130,6 +130,7 @@ class OfflineService extends ChangeNotifier {
       final b = (subsonicService as dynamic).baseUrl ?? (subsonicService as dynamic).serverUrl;
       if (b is String && b.isNotEmpty && baseUrl.isEmpty) baseUrl = b;
     } catch (_) {}
+    _scheduleAutoResume(subsonicService);
   }
 
   // Состояние
@@ -145,6 +146,17 @@ class OfflineService extends ChangeNotifier {
   final Map<String, DownloadProgress> _downloadProgress = {};
   Map<String, DownloadProgress> get downloadProgress =>
       Map.unmodifiable(_downloadProgress);
+
+  /// Названия качающихся треков для уведомлений (id -> title).
+  final Map<String, String> _downloadTitles = {};
+  Map<String, String> get downloadTitles =>
+      Map.unmodifiable(_downloadTitles);
+
+  /// Персистентная очередь недокачанного (докачка после убийства приложения).
+  static const _pendingQueueKey = 'offline_pending_queue_v1';
+  static const _maxPending = 500;
+  static const _maxPendingTries = 5;
+  bool _autoResumeScheduled = false;
 
   final List<String> _downloadedTrackIds = [];
   List<String> get downloadedTrackIds => List.unmodifiable(_downloadedTrackIds);
@@ -510,6 +522,8 @@ class OfflineService extends ChangeNotifier {
       progress: 0.0,
     );
     notifyListeners();
+    _downloadTitles[trackId] = title;
+    unawaited(_addPending(trackId, title, artist, albumId));
 
     String url;
     if (subsonicService != null) {
@@ -540,6 +554,7 @@ class OfflineService extends ChangeNotifier {
     const maxAttempts = 3;
     const backoff = [Duration(seconds: 1), Duration(seconds: 2), Duration(seconds: 4)];
     Object? lastError;
+    bool permanent = false;
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       if (attempt > 0) {
         await Future.delayed(backoff[attempt - 1]);
@@ -662,6 +677,8 @@ class OfflineService extends ChangeNotifier {
         if (!_downloadedTrackIds.contains(trackId)) {
           _downloadedTrackIds.add(trackId);
         }
+        _downloadTitles.remove(trackId);
+        unawaited(_removePending(trackId));
         notifyListeners();
         await _cleanCacheIfNeeded();
         debugPrint('[OfflineService] downloadTrack OK $trackId -> $filePath '
@@ -678,7 +695,10 @@ class OfflineService extends ChangeNotifier {
           try { if (await partFile.exists()) await partFile.delete(); } catch (_) {}
         }
         // Постоянные ошибки (4xx) — выходим сразу без ретраев.
-        if (e is StateError) break;
+        if (e is StateError) {
+          permanent = true;
+          break;
+        }
         // Брейкер только что открылся (сервер лёг) — остаток попыток
         // этого трека тоже пропускаем, не ждём таймауты зря.
         final code = _statusFromError(e);
@@ -689,6 +709,14 @@ class OfflineService extends ChangeNotifier {
       } finally {
         try { client?.close(force: true); } catch (_) {}
       }
+    }
+    // Постоянный провал — из очереди убираем, транзиентный — оставляем
+    // для докачки (resumePendingQueue) и считаем попытку.
+    if (permanent) {
+      _downloadTitles.remove(trackId);
+      unawaited(_removePending(trackId));
+    } else {
+      unawaited(_bumpPendingTries(trackId));
     }
     _downloadProgress[trackId] = _downloadProgress[trackId]!.copyWith(
       isError: true,
@@ -1340,6 +1368,130 @@ class OfflineService extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Персистентная очередь недокачанного ──────────────────────────
+
+  Future<List<Map<String, dynamic>>> _readPending() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_pendingQueueKey);
+      if (raw == null || raw.isEmpty) return [];
+      return (jsonDecode(raw) as List)
+          .whereType<Map>()
+          .map((m) => Map<String, dynamic>.from(m))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _addPending(
+      String id, String title, String artist, String? albumId) async {
+    try {
+      final list = await _readPending();
+      final idx = list.indexWhere((e) => e['id'] == id);
+      final tries = idx >= 0 ? ((list[idx]['tries'] as int?) ?? 0) : 0;
+      list.removeWhere((e) => e['id'] == id);
+      list.insert(0, {
+        'id': id,
+        'title': title,
+        'artist': artist,
+        'albumId': albumId,
+        'tries': tries,
+      });
+      while (list.length > _maxPending) {
+        list.removeLast();
+      }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_pendingQueueKey, jsonEncode(list));
+    } catch (_) {}
+  }
+
+  Future<void> _removePending(String id) async {
+    try {
+      final list = await _readPending();
+      final n0 = list.length;
+      list.removeWhere((e) => e['id'] == id);
+      if (list.length == n0) return;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_pendingQueueKey, jsonEncode(list));
+    } catch (_) {}
+  }
+
+  Future<void> _bumpPendingTries(String id) async {
+    try {
+      final list = await _readPending();
+      var changed = false;
+      for (final e in list) {
+        if (e['id'] == id) {
+          e['tries'] = ((e['tries'] as int?) ?? 0) + 1;
+          changed = true;
+        }
+      }
+      list.removeWhere((e) => ((e['tries'] as int?) ?? 0) > _maxPendingTries);
+      if (!changed) return;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_pendingQueueKey, jsonEncode(list));
+    } catch (_) {}
+  }
+
+  /// Докачка хвоста убитой сессии: тянет незавершённое из персистентной
+  /// очереди. Нужен живой subsonicService (корректная аутентификация URL).
+  /// Возвращает число докачанных.
+  Future<int> resumePendingQueue(dynamic subsonicService) async {
+    if (subsonicService == null) return 0;
+    if (_cacheDirectory == null) await _setupCacheDirectory();
+    if (_cacheDirectory == null) return 0;
+    final pending = await _readPending();
+    if (pending.isEmpty) return 0;
+    try {
+      syncFromSubsonic(subsonicService);
+    } catch (_) {}
+    int ok = 0;
+    for (final e in pending) {
+      if (_cancelRequested) break;
+      final id = (e['id'] ?? '').toString();
+      if (id.isEmpty) {
+        unawaited(_removePending(id));
+        continue;
+      }
+      if (isTrackDownloaded(id) || getLocalPath(id) != null) {
+        unawaited(_removePending(id));
+        continue;
+      }
+      final prog = _downloadProgress[id];
+      if (prog != null &&
+          !prog.isComplete &&
+          !prog.isError &&
+          prog.progress < 1) {
+        continue; // качается прямо сейчас
+      }
+      final res = await downloadTrack(
+        trackId: id,
+        title: (e['title'] ?? 'Track').toString(),
+        artist: (e['artist'] ?? 'Unknown').toString(),
+        albumId: e['albumId']?.toString(),
+        subsonicService: subsonicService,
+      );
+      if (res) ok++;
+      await Future.delayed(const Duration(milliseconds: 350));
+    }
+    return ok;
+  }
+
+  /// Один раз за процесс: после первого контакта с живым сервером
+  /// просыпаемся через 5с и докачиваем хвост (если ничего не качается).
+  void _scheduleAutoResume(dynamic subsonicService) {
+    if (_autoResumeScheduled || subsonicService == null) return;
+    _autoResumeScheduled = true;
+    Future.delayed(const Duration(seconds: 5), () async {
+      try {
+        if (downloadState.value.isDownloading) return;
+        final n = await resumePendingQueue(subsonicService);
+        if (n > 0) debugPrint('[OfflineService] auto-resume: докачано $n');
+      } catch (_) {}
+    });
+  }
+
   Future<void> deleteAllDownloads() async {
     if (_cacheDirectory != null && await _cacheDirectory!.exists()) {
       await for (final entity in _cacheDirectory!.list()) {
@@ -1396,8 +1548,38 @@ class OfflineService extends ChangeNotifier {
   }
 
   Future<void> startBackgroundDownload(dynamic songs, dynamic subsonicService) async {
-    final List<dynamic> list = (songs is List) ? songs : [];
-    if (list.isEmpty) return;
+    final List<dynamic> incoming = (songs is List) ? songs : [];
+    if (incoming.isEmpty) return;
+    // Докачка хвоста убитой сессии: персистентная очередь идёт первой.
+    var list = List<dynamic>.from(incoming);
+    try {
+      final pending = await _readPending();
+      if (pending.isNotEmpty) {
+        final seen = <String>{};
+        for (final s in list) {
+          final id = (s is Song) ? s.id : (s['id']?.toString() ?? s.toString());
+          seen.add(id);
+        }
+        final extra = <dynamic>[];
+        for (final e in pending.reversed) {
+          final id = (e['id'] ?? '').toString();
+          if (id.isEmpty || seen.contains(id)) continue;
+          if (isTrackDownloaded(id) || getLocalPath(id) != null) {
+            unawaited(_removePending(id));
+            continue;
+          }
+          seen.add(id);
+          extra.add({
+            'id': id,
+            'title': e['title'] ?? 'Track',
+            'artist': e['artist'] ?? 'Unknown',
+            'albumId': e['albumId'],
+            'coverArt': null,
+          });
+        }
+        if (extra.isNotEmpty) list = [...extra, ...list];
+      }
+    } catch (_) {}
     if (subsonicService != null) syncFromSubsonic(subsonicService);
     if (_cacheDirectory == null) await _setupCacheDirectory();
     _cancelRequested = false;

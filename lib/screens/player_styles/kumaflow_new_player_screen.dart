@@ -21,6 +21,7 @@ import '../../widgets/cast_device_picker.dart';
 import '../../services/audiobookshelf_service.dart';
 import '../../services/kumaflow_brain/kumaflow_brain_bridge.dart';
 import '../../services/kumaflow_brain/kumaflow_brain_playback.dart';
+import '../../services/ml_service.dart';
 import '../../services/offline_service.dart';
 import '../../services/safe_image_cache_manager.dart';
 import '../../services/subsonic_service.dart';
@@ -1769,12 +1770,24 @@ class _KumaflowNewPlayerScreenState extends State<KumaflowNewPlayerScreen> {
     }
   }
 
+  /// «Сейчас играет» — фулскрин-роут на корневом навигаторе, а пуш идёт
+  /// в nested-навигатор табов. Поэтому сначала пушим, ПОТОМ снимаем плеер:
+  /// наоборот нельзя — после pop контекст стейта мёртв. KFN живёт только
+  /// внутри NowPlayingScreen-роута, так что pop корневого навигатора
+  /// закрывает именно плеер, а не что-то чужое.
+  void _popPlayerRoute() {
+    try {
+      Navigator.of(context, rootNavigator: true).pop();
+    } catch (_) {}
+  }
+
   void _navigateToArtist(BuildContext context, ArtistRef artist) {
     if (artist.id.isNotEmpty) {
       NavigationHelper.push(
         navigatorKey.currentContext ?? context,
         ArtistScreen(artistId: artist.id),
       );
+      _popPlayerRoute();
     } else if (artist.name.isNotEmpty) {
       _searchAndNavigate(context, artist.name);
     }
@@ -1825,6 +1838,7 @@ class _KumaflowNewPlayerScreenState extends State<KumaflowNewPlayerScreen> {
           navigatorKey.currentContext ?? context,
           ArtistScreen(artistId: matched.id),
         );
+        _popPlayerRoute();
       } else {
         messenger.showSnackBar(
           SnackBar(
@@ -2350,10 +2364,11 @@ class _KumaflowNewPlayerScreenState extends State<KumaflowNewPlayerScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Дизлайк — зачёркнутое сердце как на жёлтом референсе
-        // (раньше был палец thumb_down_outlined).
+        // Дизлайк — треснутое сердце как в Яндекс-стиле плеера
+        // (было рисованное зачёркнутое сердце _crossedHeart).
         _ctrlWidget(
-          _crossedHeart(sideSize, Colors.white60),
+          Icon(Icons.heart_broken_rounded,
+              size: sideSize, color: Colors.white60),
           () => _dislike(p, song),
           tooltip: 'Дизлайк',
         ),
@@ -2427,32 +2442,6 @@ class _KumaflowNewPlayerScreenState extends State<KumaflowNewPlayerScreen> {
           padding: const EdgeInsets.all(10),
           child: child,
         ),
-      ),
-    );
-  }
-
-  /// Зачёркнутое сердце для дизлайка: контур + диагональная черта.
-  /// Как на жёлтом референсе: слева перечёркнутое, справа обычное.
-  Widget _crossedHeart(double size, Color color) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Icon(Icons.favorite_border_rounded, size: size, color: color),
-          Transform.rotate(
-            angle: -0.785,
-            child: Container(
-              width: size * 1.25,
-              height: 1.8,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(1),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -3094,13 +3083,47 @@ class _QueueSheetKfnState extends State<_QueueSheetKfn> {
         if (genre.isNotEmpty) {
           final lib =
               Provider.of<LibraryProvider>(ctx, listen: false);
-          for (final s in lib.cachedAllSongs) {
+          for (final s in lib.playablePool()) {
             if (out.length >= 2) break;
             if (!seen.add(s.id)) continue;
             if ((s.genre ?? '').trim().toLowerCase() == genre) {
               out.add(_SimTrack(s, ''));
             }
           }
+        }
+      } catch (_) {}
+    }
+    // 4) Недобор — тот же артист (жанр часто пуст у скачанного).
+    if (out.length < 2) {
+      try {
+        final artist = (cur.artist ?? '').trim().toLowerCase();
+        if (artist.isNotEmpty) {
+          final lib =
+              Provider.of<LibraryProvider>(ctx, listen: false);
+          for (final s in lib.playablePool()) {
+            if (out.length >= 2) break;
+            if (!seen.add(s.id)) continue;
+            if ((s.artist ?? '').trim().toLowerCase() == artist) {
+              out.add(_SimTrack(s, 'тот же артист'));
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    // 5) Недобор — локальный микс по вайбу (всегда есть что показать).
+    if (out.length < 2) {
+      try {
+        final lib = Provider.of<LibraryProvider>(ctx, listen: false);
+        final ml = Provider.of<MLService>(ctx, listen: false);
+        final local = ml.generateLocalMixByTrack(
+          seed: cur,
+          pool: lib.playablePool(),
+          count: 2 - out.length,
+        );
+        for (final s in local) {
+          if (out.length >= 2) break;
+          if (!seen.add(s.id)) continue;
+          out.add(_SimTrack(s, 'по вайбу'));
         }
       } catch (_) {}
     }
@@ -3183,13 +3206,14 @@ class _QueueSheetKfnState extends State<_QueueSheetKfn> {
       final bridge =
           Provider.of<KumaFlowBrainBridge>(navCtx, listen: false);
       final player = Provider.of<PlayerProvider>(navCtx, listen: false);
+      final lib = Provider.of<LibraryProvider>(navCtx, listen: false);
       if (bridge.isActive) {
         try {
           final tracks = await KumaFlowBrainPlayback.startTrackRadio(
             bridge: bridge,
             subsonic: sub,
             trackId: cur.id,
-          ).timeout(const Duration(seconds: 75));
+          ).timeout(const Duration(seconds: 12));
           if (tracks.isNotEmpty) {
             await player.playSong(tracks.first,
                 playlist: tracks, startIndex: 0);
@@ -3207,6 +3231,25 @@ class _QueueSheetKfnState extends State<_QueueSheetKfn> {
       for (final s in sim) {
         if (list.length >= 11) break;
         if (seen.add(s.id)) list.add(s);
+      }
+      // Фолбэк: локальный микс по артисту/жанру/вайбу (офлайн и сервер
+      // без Last.fm). Раньше тут был тупик "[cur]" -> "Не удалось собрать".
+      if (list.length <= 1) {
+        try {
+          final ml = Provider.of<MLService>(navCtx, listen: false);
+          final pool = lib.playablePool();
+          final local = ml.generateLocalMixByTrack(
+            seed: cur,
+            pool: pool,
+            count: 10,
+          );
+          for (final s in local) {
+            if (list.length >= 11) break;
+            if (seen.add(s.id)) list.add(s);
+          }
+        } catch (e) {
+          debugPrint('[KumaFlowNew] local mix fallback failed: $e');
+        }
       }
       if (list.length > 1) {
         await player.playSong(list.first,
@@ -3508,14 +3551,14 @@ class _QueueSheetKfnState extends State<_QueueSheetKfn> {
         }
       }
     } catch (_) {}
-    // 3) Тот же жанр из локального кэша.
+    // 3) Тот же жанр из локального пула (играемое, не весь кэш).
     if (names.length < 4) {
       try {
         final genre = (cur.genre ?? '').trim().toLowerCase();
         if (genre.isNotEmpty) {
           final lib =
               Provider.of<LibraryProvider>(ctx, listen: false);
-          for (final s in lib.cachedAllSongs) {
+          for (final s in lib.playablePool()) {
             if (names.length >= 4) break;
             if ((s.genre ?? '').trim().toLowerCase() != genre) {
               continue;
@@ -3526,6 +3569,29 @@ class _QueueSheetKfnState extends State<_QueueSheetKfn> {
               names.add(a);
             }
           }
+        }
+      } catch (_) {}
+    }
+    // 4) Фолбэк чтобы секция не исчезала: топ-артисты пула по числу треков.
+    if (names.isEmpty) {
+      try {
+        final lib = Provider.of<LibraryProvider>(ctx, listen: false);
+        final freq = <String, int>{};
+        final display = <String, String>{};
+        for (final s in lib.playablePool()) {
+          final a = (s.artist ?? '').trim();
+          if (a.isEmpty) continue;
+          final k = a.toLowerCase();
+          if (!seen.contains(k)) {
+            freq[k] = (freq[k] ?? 0) + 1;
+            display[k] ??= a;
+          }
+        }
+        final sorted = freq.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
+        for (final e in sorted) {
+          if (names.length >= 4) break;
+          names.add(display[e.key]!);
         }
       } catch (_) {}
     }
@@ -3575,9 +3641,8 @@ class _QueueSheetKfnState extends State<_QueueSheetKfn> {
           .search(trimmed, artistCount: 5, albumCount: 0, songCount: 0)
           .timeout(const Duration(seconds: 8));
       if (found.artists.isEmpty) {
-        messenger.showSnackBar(
-            SnackBar(content: Text('Артист не найден: $trimmed')));
-        return;
+        // Сервер не знает артиста (или офлайн) — пробуем локальную волну.
+        return _playLocalArtistWave(navCtx, messenger, player, trimmed);
       }
       final matched = found.artists.firstWhere(
         (a) => a.name.toLowerCase() == trimmed.toLowerCase(),
@@ -3587,19 +3652,61 @@ class _QueueSheetKfnState extends State<_QueueSheetKfn> {
           .getArtistTopSongs(matched.id, count: 25)
           .timeout(const Duration(seconds: 8));
       if (tracks.isEmpty) {
-        messenger.showSnackBar(
-            const SnackBar(content: Text('Треки артиста не найдены')));
-        return;
+        // Сервер без Last.fm отдал пусто — строим волну локально.
+        return _playLocalArtistWave(navCtx, messenger, player, trimmed);
       }
       tracks.shuffle();
       await player.playSong(tracks.first,
           playlist: tracks, startIndex: 0);
     } catch (e) {
+      // Сеть упала (офлайн) — пробуем локальную волну вместо ошибки.
+      try {
+        final navCtx2 = navigatorKey.currentContext;
+        if (navCtx2 != null) {
+          final player2 =
+              Provider.of<PlayerProvider>(navCtx2, listen: false);
+          final messenger2 = ScaffoldMessenger.of(navCtx2);
+          await _playLocalArtistWave(navCtx2, messenger2, player2, trimmed);
+          return;
+        }
+      } catch (_) {}
       messenger.showSnackBar(SnackBar(content: Text('Ошибка: $e')));
     }
   }
 
-  Future<void> _openArtistByName(BuildContext ctx, String name) async {    Navigator.pop(ctx);
+  Future<void> _playLocalArtistWave(
+    BuildContext navCtx,
+    ScaffoldMessengerState messenger,
+    PlayerProvider player,
+    String trimmed,
+  ) async {
+    try {
+      final lib = Provider.of<LibraryProvider>(navCtx, listen: false);
+      final ml = Provider.of<MLService>(navCtx, listen: false);
+      final pool = lib.playablePool();
+      final local = ml.generateLocalArtistWave(
+        artistName: trimmed,
+        pool: pool,
+        count: 25,
+      );
+      if (local.isEmpty) {
+        messenger.showSnackBar(
+            SnackBar(content: Text('Треки артиста не найдены: $trimmed')));
+        return;
+      }
+      await player.playSong(local.first, playlist: local, startIndex: 0);
+      messenger.showSnackBar(
+        SnackBar(
+            content: Text('Волна по $trimmed: ${local.length} треков (офлайн)'),
+            duration: const Duration(seconds: 2)),
+      );
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+    }
+  }
+
+  Future<void> _openArtistByName(BuildContext ctx, String name) async {    final rootNav = Navigator.of(ctx, rootNavigator: true);
+    Navigator.pop(ctx);
     await Future.microtask(() {});
     final navCtx = navigatorKey.currentContext;
     if (navCtx == null || !context.mounted) return;
@@ -3618,6 +3725,11 @@ class _QueueSheetKfnState extends State<_QueueSheetKfn> {
         navigatorKey.currentContext ?? context,
         ArtistScreen(artistId: matched.id),
       );
+      // Шторка уже закрыта выше, сверху остался фулскрин-плеер —
+      // снимаем и его, иначе артист откроется под ним.
+      try {
+        rootNav.pop();
+      } catch (_) {}
     } catch (_) {}
   }
 

@@ -1728,12 +1728,56 @@ class RecommendationService extends ChangeNotifier {
   }
 
    List<Song> getLocalRecommendations({required List<Song> songs, int count = 20}) {
+     if (songs.isEmpty) return [];
+     if (songs.length <= count) return List<Song>.from(songs)..shuffle();
+     final rnd = Random();
      final scored = songs.map((s) {
-       final score = calculateSongScore(s);
+       // calculateSongScore уже 0..1 (с novelty/shuffle-защитой от повторов),
+       // добавляем джиттер чтобы топ-20 не был детерминированным.
+       final score = calculateSongScore(s) * 10 + rnd.nextDouble() * 3;
        return MapEntry(s, score);
      }).toList();
      scored.sort((a, b) => b.value.compareTo(a.value));
-     return scored.map((e) => e.key).take(count).toList();
+     // Взвешенная доборка: топ-8 детерминированно, остальное — сэмплинг
+     // из топ-40% чтобы хвост ротировался, с капом 2 на артиста.
+     const anchor = 8;
+     final result = <Song>[];
+     final perArtist = <String, int>{};
+     for (final e in scored) {
+       if (result.length >= anchor) break;
+       final a = (e.key.artist ?? '').trim().toLowerCase();
+       if (a.isNotEmpty && (perArtist[a] ?? 0) >= 2) continue;
+       perArtist[a] = (perArtist[a] ?? 0) + 1;
+       result.add(e.key);
+     }
+     final rest = scored
+         .where((e) => !result.contains(e.key))
+         .take((songs.length * 0.4).ceil())
+         .toList();
+     while (result.length < count && rest.isNotEmpty) {
+       double total = 0;
+       for (final e in rest) {
+         total += exp(e.value / 4.0);
+       }
+       double roll = rnd.nextDouble() * total;
+       int pick = 0;
+       for (int i = 0; i < rest.length; i++) {
+         roll -= exp(rest[i].value / 4.0);
+         if (roll <= 0) {
+           pick = i;
+           break;
+         }
+       }
+       final song = rest.removeAt(pick).key;
+       final a = (song.artist ?? '').trim().toLowerCase();
+       if (a.isNotEmpty && (perArtist[a] ?? 0) >= 2 && rest.length > count) {
+         continue;
+       }
+       perArtist[a] = (perArtist[a] ?? 0) + 1;
+       result.add(song);
+     }
+     result.shuffle(rnd);
+     return result;
    }
 
    List<String> getRecommendedArtists({int limit = 10}) => _getTopArtists(limit);

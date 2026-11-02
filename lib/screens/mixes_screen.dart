@@ -10,12 +10,15 @@ import '../services/recommendation_service.dart';
 import '../services/ai_service.dart';
 import '../services/ai_mix_service.dart';
 import '../services/mix_cache_service.dart';
+import '../services/shared_mixes_loader.dart';
 import '../services/ml_playlist_service.dart';
 import '../services/subsonic_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/song_tile.dart';
 import '../widgets/instant_mix_dialog.dart';
 import '../services/auto_dj_service.dart';
+import '../services/kumaflow_brain/kumaflow_brain_bridge.dart';
+import '../services/kumaflow_brain/kumaflow_brain_playback.dart';
 import '../services/player_ui_settings_service.dart';
 import '../services/playlist_orchestrator.dart';
 import '../services/wave_identity.dart';
@@ -82,6 +85,11 @@ class _MixesScreenState extends State<MixesScreen> {
   AiMixResult? _aiDailyMix;
   bool _aiDailyLoading = false;
   bool _aiDailyExpanded = false;
+  List<Song>? _brainWeeklySongs;
+  bool _brainWeeklyLoading = false;
+  bool _brainWeeklyExpanded = false;
+  String? _brainWeeklyError;
+  bool _brainWeeklyTried = false;
 
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
 
@@ -184,6 +192,47 @@ class _MixesScreenState extends State<MixesScreen> {
       debugPrint('[Mixes] DailyMix error: $e');
     } finally {
       if (mounted) setState(() => _dailyMixLoading = false);
+    }
+  }
+
+  /// Открытия недели (KumaFlow Brain): weeklyDiscovery -> резолв в библиотеку.
+  /// Лениво, только по refresh или один авто-заход при открытом мозге.
+  /// Эфемерно (in-memory), в Плейлисты — только явным сохранением.
+  Future<void> _loadBrainWeekly({bool force = false}) async {
+    if (_brainWeeklyLoading || !mounted) return;
+    final bridge = Provider.of<KumaFlowBrainBridge>(context, listen: false);
+    if (!bridge.isActive) {
+      if (mounted) {
+        setState(() => _brainWeeklyError = 'Мозг выключен: Настройки → ML → KumaFlow Brain');
+      }
+      return;
+    }
+    setState(() {
+      _brainWeeklyLoading = true;
+      _brainWeeklyError = null;
+    });
+    try {
+      final sub = Provider.of<SubsonicService>(context, listen: false);
+      final songs = await KumaFlowBrainPlayback.fetchWeekly(
+        bridge: bridge,
+        subsonic: sub,
+        n: 30,
+      ).timeout(const Duration(seconds: 60));
+      if (mounted) {
+        setState(() {
+          _brainWeeklySongs = songs;
+          _brainWeeklyTried = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _brainWeeklyError = '$e';
+          _brainWeeklyTried = true;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _brainWeeklyLoading = false);
     }
   }
 
@@ -290,52 +339,55 @@ class _MixesScreenState extends State<MixesScreen> {
           final key = _computeCacheKey(filteredSongs, recService);
           if (key != _lastKey) {
             _lastKey = key;
-            final _capKey = key;
-            final _capSongs = List<Song>.from(filteredSongs);
-            // Try cache first (TTL 12h), then generate
-            MixCacheService().loadAllMixes(_capKey, _capSongs).then((cached) {
-              if (cached != null && _capKey == _lastKey && mounted) {
-                setState(() => _cachedMixes = cached);
-                if (_madeForYouSongs == null && !_madeForYouLoading) _loadMadeForYou(_capSongs);
-                if (_aiDailyMix == null && !_aiDailyLoading) _loadAiDailyMix(_capSongs);
-                // Daily — лениво, только по тапу на refresh в Daily секции, не авто
-                return;
+            final capKey = key;
+            final localeCode = Localizations.localeOf(context).languageCode;
+            Future.microtask(() async {
+              if (capKey != _lastKey || !mounted) return;
+              // Единый пул (700 из БД) и лоадер с Home + single-flight:
+              // изолят считается один раз на оба экрана.
+              List<Song> pool = const [];
+              try {
+                pool = await libraryProvider.getPoolForMix(limit: 700);
+              } catch (_) {}
+              if (pool.length < 15) pool = List<Song>.from(filteredSongs);
+              if (capKey != _lastKey || !mounted) return;
+              final mixes = await SharedMixesLoader().getAllMixes(
+                pool: pool,
+                bannedKey: recService.bannedArtistsKey,
+                rec: recService,
+              );
+              if (capKey != _lastKey || !mounted) return;
+              if (mixes.isEmpty) return;
+              setState(() => _cachedMixes = mixes);
+              if (_madeForYouSongs == null && !_madeForYouLoading) {
+                _loadMadeForYou(pool);
               }
-              Future.microtask(() async {
-                // Тяжёлый скоринг — в отдельном изоляте, UI не висит.
-                final mixes = await recService.generateMixesIsolated(_capSongs);
-                if (_capKey == _lastKey && mounted) {
-                  setState(() => _cachedMixes = mixes);
-                  MixCacheService().saveAllMixes(_capKey, mixes);
-                  if (_madeForYouSongs == null && !_madeForYouLoading) _loadMadeForYou(_capSongs);
-                  if (_aiDailyMix == null && !_aiDailyLoading) _loadAiDailyMix(_capSongs);
-                  // Daily и AI rename — отложено чтобы не ANR, только по требованию
-                  // AI rename after mixes ready, sequential with delay to avoid 429/ANR
-                  if (AiService().isConfigured && mixes.isNotEmpty) {
-                    final ai = AiService();
-                    final snapshot = Map<String, List<Song>>.from(mixes);
-                    final renamed = <String, List<Song>>{};
-                    final localeCode = Localizations.localeOf(context).languageCode;
-                    for (final e in snapshot.entries) {
-                      try {
-                        final aiName = await ai.generateMixName(e.value, hint: e.key, locale: localeCode);
-                        renamed[aiName.isEmpty ? e.key : aiName] = e.value;
-                      } catch (_) {
-                        renamed[e.key] = e.value;
-                      }
-                      await Future.delayed(const Duration(milliseconds: 400));
-                    }
-                    if (mounted && _capKey == _lastKey) {
-                      setState(() => _cachedMixes = renamed);
-                      MixCacheService().saveAllMixes(_capKey, renamed);
-                    }
+              if (_aiDailyMix == null && !_aiDailyLoading) {
+                _loadAiDailyMix(pool);
+              }
+              // AI rename after mixes ready, sequential with delay to avoid 429/ANR
+              if (AiService().isConfigured) {
+                final ai = AiService();
+                final snapshot = Map<String, List<Song>>.from(mixes);
+                final renamed = <String, List<Song>>{};
+                for (final e in snapshot.entries) {
+                  try {
+                    final aiName = await ai.generateMixName(e.value, hint: e.key, locale: localeCode);
+                    renamed[aiName.isEmpty ? e.key : aiName] = e.value;
+                  } catch (_) {
+                    renamed[e.key] = e.value;
                   }
+                  await Future.delayed(const Duration(milliseconds: 400));
                 }
-              });
+                if (mounted && capKey == _lastKey) {
+                  setState(() => _cachedMixes = renamed);
+                  MixCacheService().saveAllMixes(
+                    SharedMixesLoader.cacheKeyFor(pool, recService.bannedArtistsKey),
+                    renamed,
+                  );
+                }
+              }
             });
-            if (_cachedMixes.isEmpty) {
-              // keep placeholder until async completes
-            }
             if (_madeForYouSongs == null && !_madeForYouLoading) {
               _loadMadeForYou(filteredSongs);
             }
@@ -386,6 +438,7 @@ class _MixesScreenState extends State<MixesScreen> {
                 SliverToBoxAdapter(child: _buildMadeForYouSection(context)),
                 SliverToBoxAdapter(child: _buildDailyMixSection(context)),
                 SliverToBoxAdapter(child: _buildAiDailyMixSection(context)),
+                SliverToBoxAdapter(child: _buildBrainWeeklySection(context)),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
                   sliver: SliverGrid(
@@ -781,6 +834,128 @@ class _MixesScreenState extends State<MixesScreen> {
                             size: 16),
                         label: Text(isRu ? 'В ИИ-миксы' : 'Open AI'))),
               ])),
+        ],
+        Divider(
+            height: 1,
+            indent: 16,
+            endIndent: 16,
+            color: _isDark ? AppTheme.darkDivider : AppTheme.lightDivider),
+      ],
+    );
+  }
+
+  Widget _buildBrainWeeklySection(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+    final isRu = AppLocalizations.of(context)!.localeName.startsWith('ru');
+    final songs = _brainWeeklySongs;
+    // Один авто-заход при открытом мозге, дальше только ручной refresh.
+    try {
+      final bridge = Provider.of<KumaFlowBrainBridge>(context, listen: false);
+      if (bridge.isActive && !_brainWeeklyTried && !_brainWeeklyLoading) {
+        Future.microtask(() => _loadBrainWeekly());
+      }
+    } catch (_) {}
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Row(
+            children: [
+              Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFAF52DE).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.auto_awesome_rounded,
+                      color: Color(0xFFAF52DE), size: 24)),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(isRu ? 'Открытия недели' : 'Weekly Discovery',
+                        style: const TextStyle(
+                            fontSize: 17, fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                    Text(isRu ? 'KumaFlow Brain • weekly' : 'KumaFlow Brain • weekly',
+                        style: const TextStyle(
+                            fontSize: 12, color: Colors.grey)),
+                  ])),
+              if (_brainWeeklyLoading)
+                const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+              else
+                IconButton(
+                    tooltip: AppLocalizations.of(context)!.refresh,
+                    icon: const Icon(Icons.refresh_rounded),
+                    onPressed: () => _loadBrainWeekly(force: true)),
+              IconButton(
+                  icon: Icon(_brainWeeklyExpanded
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded),
+                  onPressed: () =>
+                      setState(() => _brainWeeklyExpanded = !_brainWeeklyExpanded)),
+            ],
+          ),
+        ),
+        if (_brainWeeklyLoading && songs == null)
+          const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(
+                  child: CircularProgressIndicator(strokeWidth: 2)))
+        else if (songs == null || songs.isEmpty)
+          Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                  _brainWeeklyError ??
+                      (isRu
+                          ? 'Нажми refresh чтобы собрать открытия недели'
+                          : 'Hit refresh to fetch weekly discovery'),
+                  style: TextStyle(
+                      color: _isDark
+                          ? AppTheme.darkSecondaryText
+                          : AppTheme.lightSecondaryText)))
+        else ...[
+          Column(
+            children: List.generate(
+              _brainWeeklyExpanded
+                  ? songs.length
+                  : (songs.length.clamp(0, 3)),
+              (i) => RepaintBoundary(
+                  child: SongTile(
+                      song: songs[i],
+                      playlist: songs,
+                      index: i,
+                      showAlbum: true)),
+            ),
+          ),
+          if (!_brainWeeklyExpanded && songs.length > 3)
+            Center(
+                child: TextButton(
+                    onPressed: () =>
+                        setState(() => _brainWeeklyExpanded = true),
+                    child: Text('Показать все (${songs.length})',
+                        style: TextStyle(color: accent)))),
+          Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: FilledButton.icon(
+                  onPressed: () async {
+                    final player = Provider.of<PlayerProvider>(context,
+                        listen: false);
+                    await clearWaveSeed();
+                    await player.playSong(songs.first,
+                        playlist: songs,
+                        startIndex: 0,
+                        playlistName: 'Открытия недели');
+                  },
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: Text(isRu ? 'Слушать' : 'Play'))),
         ],
         Divider(
             height: 1,
