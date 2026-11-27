@@ -49,8 +49,7 @@ class MiniPlayer extends StatelessWidget {
           coverArt = null;
         } else if (currentSong != null) {
           title = currentSong.title;
-          subtitle =
-              currentSong.artistParticipants != null &&
+          subtitle = currentSong.artistParticipants != null &&
                   currentSong.artistParticipants!.isNotEmpty
               ? currentSong.artistParticipants!.map((a) => a.name).join(', ')
               : currentSong.artist;
@@ -60,10 +59,11 @@ class MiniPlayer extends StatelessWidget {
         }
 
         final bool isGlass = Provider.of<ThemeService>(context).liquidGlass;
+        final Widget progressBar =
+            isPlayingRadio ? const SizedBox(height: 2) : _buildProgressBar();
 
         final Widget row = ValueListenableBuilder<bool>(
-          valueListenable:
-              PlayerUiSettingsService().miniPlayerPcStyleNotifier,
+          valueListenable: PlayerUiSettingsService().miniPlayerPcStyleNotifier,
           builder: (ctx, pcStyle, __) => _MiniPlayerRow(
             title: title,
             subtitle: subtitle,
@@ -108,7 +108,12 @@ class MiniPlayer extends StatelessWidget {
                           width: 0.8,
                         ),
                       ),
-                      child: row,
+                      child: Column(
+                        children: [
+                          progressBar,
+                          Expanded(child: row),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -128,72 +133,64 @@ class MiniPlayer extends StatelessWidget {
                     : Colors.white.withValues(alpha: 0.95),
                 border: Border(
                   top: BorderSide(
-                    color: isDark
-                        ? AppTheme.darkDivider
-                        : AppTheme.lightDivider,
+                    color:
+                        isDark ? AppTheme.darkDivider : AppTheme.lightDivider,
                     width: 0.5,
                   ),
                 ),
               ),
               child: Column(
                 children: [
-                  if (!isPlayingRadio)
-                    Selector<PlayerProvider, double>(
-                      selector: (ctx, p) => p.progress,
-                      builder: (ctx, progress, __) {
-                        return ValueListenableBuilder<double>(
-                          valueListenable: PlayerUiSettingsService()
-                              .progressBarHeightNotifier,
-                          builder: (ctx2, pHeight, __2) {
-                            final pbStyle = PlayerUiSettingsService()
-                                .progressBarStyleNotifier
-                                .value;
-                            final pbColor = Color(
-                              PlayerUiSettingsService()
-                                  .progressBarColorNotifier
-                                  .value,
-                            );
-                            final pbAnim = PlayerUiSettingsService()
-                                .progressBarAnimationNotifier
-                                .value;
-                            final h = pHeight.clamp(1.0, 6.0);
-                            return TweenAnimationBuilder<double>(
-                              duration: pbAnim
-                                  ? const Duration(milliseconds: 200)
-                                  : Duration.zero,
-                              curve: Curves.linear,
-                              tween: Tween(begin: 0.0, end: progress),
-                              builder: (ctx3, value, __3) {
-                                return ClipRRect(
-                                  borderRadius: pbStyle == 'rounded'
-                                      ? BorderRadius.circular(h / 2)
-                                      : BorderRadius.zero,
-                                  child: Container(
-                                    height: h,
-                                    color: Colors.white
-                                        .withValues(alpha: 0.18),
-                                    child: FractionallySizedBox(
-                                      alignment: Alignment.centerLeft,
-                                      widthFactor: value.clamp(0.0, 1.0),
-                                      child: Container(
-                                        color: pbColor,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        );
-                      },
-                    )
-                  else
-                    const SizedBox(height: 2),
+                  progressBar,
                   Expanded(child: row),
                 ],
               ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  /// Тонкий прогресс-бар мини-плеера (в т.ч. в стеклянном режиме).
+  Widget _buildProgressBar() {
+    return Selector<PlayerProvider, double>(
+      selector: (ctx, p) => p.progress,
+      builder: (ctx, progress, __) {
+        return ValueListenableBuilder<double>(
+          valueListenable: PlayerUiSettingsService().progressBarHeightNotifier,
+          builder: (ctx2, pHeight, __2) {
+            final pbStyle =
+                PlayerUiSettingsService().progressBarStyleNotifier.value;
+            final pbColor = Color(
+              PlayerUiSettingsService().progressBarColorNotifier.value,
+            );
+            final pbAnim =
+                PlayerUiSettingsService().progressBarAnimationNotifier.value;
+            final h = pHeight.clamp(1.0, 6.0);
+            return TweenAnimationBuilder<double>(
+              duration:
+                  pbAnim ? const Duration(milliseconds: 200) : Duration.zero,
+              curve: Curves.linear,
+              tween: Tween(begin: 0.0, end: progress),
+              builder: (ctx3, value, __3) {
+                return ClipRRect(
+                  borderRadius: pbStyle == 'rounded'
+                      ? BorderRadius.circular(h / 2)
+                      : BorderRadius.zero,
+                  child: Container(
+                    height: h,
+                    color: Colors.white.withValues(alpha: 0.18),
+                    child: FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: value.clamp(0.0, 1.0),
+                      child: Container(color: pbColor),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
         );
       },
     );
@@ -239,7 +236,8 @@ class _MiniPlayerRow extends StatelessWidget {
               child: const Icon(Icons.radio, color: Colors.white, size: 24),
             )
           else
-            AlbumArtwork(coverArt: coverArt, size: 44, borderRadius: 10, song: song),
+            AlbumArtwork(
+                coverArt: coverArt, size: 44, borderRadius: 10, song: song),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -377,7 +375,8 @@ class _MiniPlayerControls extends StatelessWidget {
               valueListenable: playerUiSettings.showMiniPlayerRepeatNotifier,
               builder: (context, showRepeat, _) {
                 return ValueListenableBuilder<bool>(
-                  valueListenable: playerUiSettings.showMiniPlayerShuffleNotifier,
+                  valueListenable:
+                      playerUiSettings.showMiniPlayerShuffleNotifier,
                   builder: (context, showShuffle, _) {
                     return Row(
                       mainAxisSize: MainAxisSize.min,
@@ -389,10 +388,14 @@ class _MiniPlayerControls extends StatelessWidget {
                               return IconButton(
                                 onPressed: provider.toggleFavorite,
                                 padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                constraints: const BoxConstraints(
+                                    minWidth: 36, minHeight: 36),
                                 icon: Icon(
-                                  isStarred ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                                  size: ScreenHelper.miniPlayerIconSize(context),
+                                  isStarred
+                                      ? Icons.favorite_rounded
+                                      : Icons.favorite_border_rounded,
+                                  size:
+                                      ScreenHelper.miniPlayerIconSize(context),
                                 ),
                                 color: isStarred
                                     ? Theme.of(context).colorScheme.primary
@@ -408,12 +411,16 @@ class _MiniPlayerControls extends StatelessWidget {
                               return IconButton(
                                 onPressed: provider.toggleShuffle,
                                 padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                constraints: const BoxConstraints(
+                                    minWidth: 36, minHeight: 36),
                                 icon: Icon(
                                   CupertinoIcons.shuffle,
-                                  size: ScreenHelper.miniPlayerIconSize(context),
+                                  size:
+                                      ScreenHelper.miniPlayerIconSize(context),
                                 ),
-                                color: shuffleEnabled ? Theme.of(context).colorScheme.primary : color,
+                                color: shuffleEnabled
+                                    ? Theme.of(context).colorScheme.primary
+                                    : color,
                               );
                             },
                           ),
@@ -444,7 +451,8 @@ class _MiniPlayerControls extends StatelessWidget {
                                 isPlaying
                                     ? Icons.pause_rounded
                                     : Icons.play_arrow_rounded,
-                                size: ScreenHelper.miniPlayerPlayIconSize(context),
+                                size: ScreenHelper.miniPlayerPlayIconSize(
+                                    context),
                                 color: Colors.white,
                               ),
                             ),
@@ -453,10 +461,14 @@ class _MiniPlayerControls extends StatelessWidget {
                           IconButton(
                             onPressed: provider.togglePlayPause,
                             padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                            constraints: const BoxConstraints(
+                                minWidth: 40, minHeight: 40),
                             icon: Icon(
-                              isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                              size: ScreenHelper.miniPlayerPlayIconSize(context),
+                              isPlaying
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
+                              size:
+                                  ScreenHelper.miniPlayerPlayIconSize(context),
                             ),
                             color: color,
                           ),
@@ -475,9 +487,14 @@ class _MiniPlayerControls extends StatelessWidget {
                               return IconButton(
                                 onPressed: provider.toggleRepeat,
                                 padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                                icon: Icon(icon, size: ScreenHelper.miniPlayerIconSize(context)),
-                                color: active ? Theme.of(context).colorScheme.primary : color,
+                                constraints: const BoxConstraints(
+                                    minWidth: 36, minHeight: 36),
+                                icon: Icon(icon,
+                                    size: ScreenHelper.miniPlayerIconSize(
+                                        context)),
+                                color: active
+                                    ? Theme.of(context).colorScheme.primary
+                                    : color,
                               );
                             },
                           ),
@@ -486,8 +503,11 @@ class _MiniPlayerControls extends StatelessWidget {
                           IconButton(
                             onPressed: hasNext ? provider.skipNext : null,
                             padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                            icon: Icon(Icons.skip_next_rounded, size: ScreenHelper.miniPlayerSkipIconSize(context)),
+                            constraints: const BoxConstraints(
+                                minWidth: 36, minHeight: 36),
+                            icon: Icon(Icons.skip_next_rounded,
+                                size: ScreenHelper.miniPlayerSkipIconSize(
+                                    context)),
                             color: color,
                           ),
 
@@ -501,8 +521,10 @@ class _MiniPlayerControls extends StatelessWidget {
                               builder: (_) => const KionQueueSheet(),
                             ),
                             padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                            icon: Icon(Icons.queue_music_rounded, size: ScreenHelper.miniPlayerIconSize(context)),
+                            constraints: const BoxConstraints(
+                                minWidth: 36, minHeight: 36),
+                            icon: Icon(Icons.queue_music_rounded,
+                                size: ScreenHelper.miniPlayerIconSize(context)),
                             color: color,
                           ),
                       ],

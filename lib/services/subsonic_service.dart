@@ -27,12 +27,10 @@ class PingResult {
 
 /// Isolate-парсинг search3 страниц: тяжёлый fromJson не должен жечь main-поток
 /// во время воспроизведения. В isolate едут только plain-data (List of Maps).
-List<Map<String, dynamic>> _parseAlbumsIsolate(List<dynamic> raw) => raw
-    .map((a) => Map<String, dynamic>.from(a as Map))
-    .toList();
-List<Map<String, dynamic>> _parseSongsIsolate(List<dynamic> raw) => raw
-    .map((s) => Map<String, dynamic>.from(s as Map))
-    .toList();
+List<Map<String, dynamic>> _parseAlbumsIsolate(List<dynamic> raw) =>
+    raw.map((a) => Map<String, dynamic>.from(a as Map)).toList();
+List<Map<String, dynamic>> _parseSongsIsolate(List<dynamic> raw) =>
+    raw.map((s) => Map<String, dynamic>.from(s as Map)).toList();
 
 class SubsonicService {
   Dio _dio;
@@ -120,7 +118,8 @@ class SubsonicService {
           sw?.stop();
           final ms = sw?.elapsedMilliseconds ?? 0;
           final safe = _sanitizeUrl(e.requestOptions.uri.toString());
-          debugPrint('[KumaFlow] ✗ ${e.type.name} $safe (${ms}ms) — ${_shortMsg(e.message)}');
+          debugPrint(
+              '[KumaFlow] ✗ ${e.type.name} $safe (${ms}ms) — ${_shortMsg(e.message)}');
           if (e.error != null) debugPrint('[KumaFlow]   cause: ${e.error}');
           // Диагностика 4xx/5xx: кто режет — видно по Server-заголовку и телу.
           try {
@@ -128,7 +127,8 @@ class SubsonicService {
             if (resp != null) {
               debugPrint('[KumaFlow]   headers: ${resp.headers.map}');
               final body = '${resp.data}';
-              debugPrint('[KumaFlow]   body[${body.length}]: ${body.substring(0, body.length > 400 ? 400 : body.length)}');
+              debugPrint(
+                  '[KumaFlow]   body[${body.length}]: ${body.substring(0, body.length > 400 ? 400 : body.length)}');
             }
           } catch (_) {}
           // Ретраи на чужой 410 от облака Keenetic (NDM NDNS Unknown Name)
@@ -145,7 +145,8 @@ class SubsonicService {
           final maxTries = is410 ? 3 : (isTimeout ? 1 : 0);
           if ((is410 || isTimeout) && ndnsTries < maxTries) {
             final host = e.requestOptions.uri.host;
-            debugPrint('[Net] retry ${ndnsTries + 1}/$maxTries after ${is410 ? 'NDNS-410' : e.type.name} for $host');
+            debugPrint(
+                '[Net] retry ${ndnsTries + 1}/$maxTries after ${is410 ? 'NDNS-410' : e.type.name} for $host');
             e.requestOptions.extra['_ndnsRetried'] = ndnsTries + 1;
             _dio
                 .fetch<Map<String, dynamic>>(e.requestOptions)
@@ -373,7 +374,8 @@ class SubsonicService {
     _stableAuthParams = params;
   }
 
-  String _buildUrl(String endpoint, [Map<String, String>? extraParams]) {
+  String _buildUrl(String endpoint,
+      [Map<String, String>? extraParams, bool useMusicFolder = true]) {
     if (_config == null) throw Exception('Server not configured');
 
     final params = _getAuthParams();
@@ -381,7 +383,9 @@ class SubsonicService {
       params.addAll(extraParams);
     }
 
-    if (_config!.selectedMusicFolderIds.isNotEmpty) {
+    // Поиск — по всей библиотеке: иначе первая выбранная папка вырезала бы
+    // треки/альбомы из выдачи, и оставались только подкасты.
+    if (useMusicFolder && _config!.selectedMusicFolderIds.isNotEmpty) {
       params['musicFolderId'] = _config!.selectedMusicFolderIds.first;
     }
 
@@ -398,8 +402,9 @@ class SubsonicService {
   Future<Map<String, dynamic>> _request(
     String endpoint, [
     Map<String, String>? params,
+    bool useMusicFolder = true,
   ]) async {
-    final url = _buildUrl(endpoint, params);
+    final url = _buildUrl(endpoint, params, useMusicFolder);
     final token = _newCancelToken();
 
     try {
@@ -476,19 +481,22 @@ class SubsonicService {
     if (_jellyfin != null || _youtube != null) return true;
     if (_songLyricsEnabledCached != null) return _songLyricsEnabledCached!;
     try {
-      final res = await _request('getOpenSubsonicExtensions').timeout(const Duration(seconds: 4));
+      final res = await _request('getOpenSubsonicExtensions')
+          .timeout(const Duration(seconds: 4));
       // Navidrome returns { openSubsonicExtensions: [{name:'songLyrics', versions:[1]}] }
       final exts = res['openSubsonicExtensions'] as List?;
       if (exts != null) {
-        _songLyricsEnabledCached =
-            exts.any((e) => (e is Map && (e['name'] == 'songLyrics' || e['name'] == 'structuredLyrics')));
-        debugPrint('[Subsonic] songLyrics extension: $_songLyricsEnabledCached');
+        _songLyricsEnabledCached = exts.any((e) => (e is Map &&
+            (e['name'] == 'songLyrics' || e['name'] == 'structuredLyrics')));
+        debugPrint(
+            '[Subsonic] songLyrics extension: $_songLyricsEnabledCached');
         return _songLyricsEnabledCached!;
       }
       // Fallback: some servers return { extensions: [...] }
       final alt = res['extensions'] as List?;
       if (alt != null) {
-        _songLyricsEnabledCached = alt.any((e) => e.toString().contains('songLyrics'));
+        _songLyricsEnabledCached =
+            alt.any((e) => e.toString().contains('songLyrics'));
         return _songLyricsEnabledCached!;
       }
       _songLyricsEnabledCached = false;
@@ -497,7 +505,8 @@ class SubsonicService {
       // Если endpoint не поддерживается (404) — считаем выключенным чтобы не ждать 5s каждый раз
       if (e.toString().contains('404') || e.toString().contains('Not Found')) {
         _songLyricsEnabledCached = false;
-        debugPrint('[Subsonic] getOpenSubsonicExtensions 404 -> songLyrics disabled');
+        debugPrint(
+            '[Subsonic] getOpenSubsonicExtensions 404 -> songLyrics disabled');
         return false;
       }
       // Иначе считаем включенным (fail-open)
@@ -541,8 +550,7 @@ class SubsonicService {
       // Щупаем ВСЕ IPv4 (KeenDNS ротирует A-записи, одна может быть
       // протухшей): лучший TCP в зачёт, плюс какой IP победил — в лог.
       var tcpOk = false;
-      for (final a in addrs.where(
-          (x) => x.type == InternetAddressType.IPv4)) {
+      for (final a in addrs.where((x) => x.type == InternetAddressType.IPv4)) {
         final t = Stopwatch()..start();
         try {
           final sock = await Socket.connect(a, port,
@@ -609,7 +617,8 @@ class SubsonicService {
     return 'net';
   }
 
-  Future<PingResult> pingWithError() async {    if (_jellyfin != null) return _jellyfin!.pingWithError();
+  Future<PingResult> pingWithError() async {
+    if (_jellyfin != null) return _jellyfin!.pingWithError();
     if (_youtube != null) return _youtube!.pingWithError();
     try {
       final response = await _request('ping');
@@ -957,15 +966,18 @@ class SubsonicService {
         artistCount: artistCount,
       );
     }
-    final response = await _request('search3', {
-      'query': query,
-      'artistCount': artistCount.toString(),
-      'artistOffset': artistOffset.toString(),
-      'albumCount': albumCount.toString(),
-      'albumOffset': albumOffset.toString(),
-      'songCount': songCount.toString(),
-      'songOffset': songOffset.toString(),
-    });
+    final response = await _request(
+        'search3',
+        {
+          'query': query,
+          'artistCount': artistCount.toString(),
+          'artistOffset': artistOffset.toString(),
+          'albumCount': albumCount.toString(),
+          'albumOffset': albumOffset.toString(),
+          'songCount': songCount.toString(),
+          'songOffset': songOffset.toString(),
+        },
+        false);
 
     final searchResult = response['searchResult3'];
     debugPrint('SubsonicService: search3 response: searchResult=$searchResult');
@@ -1096,20 +1108,26 @@ class SubsonicService {
       await _youtube!.scrobble(id, submission: submission);
       return;
     }
-    final params = <String, String>{'id': id, 'submission': submission.toString()};
+    final params = <String, String>{
+      'id': id,
+      'submission': submission.toString()
+    };
     // Subsonic api spec: time in milliseconds since 1 Jan 1970 (Navidrome docs: scrobble time ms)
     if (submission) {
       final t = time ?? DateTime.now().millisecondsSinceEpoch;
       params['time'] = t.toString();
     } else {
       // nowPlaying also benefits from explicit time on some Navidrome versions
-      params['time'] = (time ?? DateTime.now().millisecondsSinceEpoch).toString();
+      params['time'] =
+          (time ?? DateTime.now().millisecondsSinceEpoch).toString();
     }
     try {
       await _request('scrobble', params);
-      debugPrint('[KumaFlow] scrobble ${submission ? 'submission' : 'nowPlaying'} ok id=$id c=$_clientName');
+      debugPrint(
+          '[KumaFlow] scrobble ${submission ? 'submission' : 'nowPlaying'} ok id=$id c=$_clientName');
     } catch (e) {
-      debugPrint('[KumaFlow] scrobble ${submission ? 'submission' : 'nowPlaying'} failed id=$id: $e');
+      debugPrint(
+          '[KumaFlow] scrobble ${submission ? 'submission' : 'nowPlaying'} failed id=$id: $e');
       rethrow;
     }
   }
@@ -1611,13 +1629,15 @@ class SubsonicService {
     int count = 1000,
   }) async {
     if (_jellyfin != null) {
-      return _jellyfin!.search(
-        '',
-        artistCount: count,
-        artistOffset: offset,
-        albumCount: 0,
-        songCount: 0,
-      ).then((r) => r.artists);
+      return _jellyfin!
+          .search(
+            '',
+            artistCount: count,
+            artistOffset: offset,
+            albumCount: 0,
+            songCount: 0,
+          )
+          .then((r) => r.artists);
     }
     if (_youtube != null) return [];
     try {

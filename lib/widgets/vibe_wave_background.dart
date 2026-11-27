@@ -65,8 +65,8 @@ class VibeWaveBackground extends StatefulWidget {
 }
 
 /// Пресеты формы шейдера по настроению жанра — 1в1 VIBE_MOOD_SHAPE с ПК.
-({double bend, double rays, double neonMul, double softness})
-    _vibeShapeForMood(WaveMood mood) {
+({double bend, double rays, double neonMul, double softness}) _vibeShapeForMood(
+    WaveMood mood) {
   switch (mood) {
     case WaveMood.fire:
       return (bend: 0.9, rays: 0.32, neonMul: 1.1, softness: 0.74);
@@ -123,6 +123,7 @@ class _VibeWaveBackgroundState extends State<VibeWaveBackground>
   static bool _failed = false;
 
   Ticker? _ticker;
+  Timer? _stopTimer;
   final ValueNotifier<int> _frame = ValueNotifier(0);
   double _time = 0;
   double _energyShown = 0.5;
@@ -148,6 +149,7 @@ class _VibeWaveBackgroundState extends State<VibeWaveBackground>
     }
     try {
       _program = await ui.FragmentProgram.fromAsset('shaders/vibe_wave.frag');
+      debugPrint('[Vibe] shader compiled — KumaWave V3 live');
     } catch (e) {
       debugPrint('[Vibe] shader load failed: $e');
       _failed = true;
@@ -171,18 +173,21 @@ class _VibeWaveBackgroundState extends State<VibeWaveBackground>
   }
 
   void _applyTicker() {
-    // Как движок на ПК: узел висит подключённым и на паузе — тикер идёт
-    // всегда, пока карточка видна: на паузе время течёт медленно (0.12x),
-    // энергия спадает к покою. Полный стоп — только вне экрана / в фоне.
+    // Плавный стоп: сначала гасим энергию (~350 мс), потом полностью останавливаем
+    // тикер — так анимация не обрывается рывком и не ест ресурсы в фоне.
     final want = _visible && _appActive;
-    if (want && _ticker == null) {
-      _ticker = createTicker(_onTick)..start();
-    } else if (!want) {
+    _stopTimer?.cancel();
+    if (want) {
+      if (_ticker == null) _ticker = createTicker(_onTick)..start();
+      return;
+    }
+    _stopTimer = Timer(const Duration(milliseconds: 350), () {
+      if (_visible || _appActive || !mounted) return;
       _lastTick = null;
       _ticker?.stop();
       _ticker?.dispose();
       _ticker = null;
-    }
+    });
   }
 
   void _onTick(Duration elapsed) {
@@ -191,10 +196,13 @@ class _VibeWaveBackgroundState extends State<VibeWaveBackground>
     _lastTick = elapsed;
     if (last == null) return;
     final dt = (elapsed - last).inMicroseconds / 1e6;
-    if (dt < 0.033) return;
-    final speed = widget.isPlaying ? widget.speed : widget.speed * 0.12;
+    if (dt < 0.042) return; // ~24fps — хватает для плавности, легче для GPU
+    final active = _visible && _appActive;
+    final speed = (widget.isPlaying ? widget.speed : widget.speed * 0.6) * 2.5;
     _time += dt.clamp(0.0, 0.05) * speed;
-    final target = widget.isPlaying ? widget.energy.clamp(0.0, 1.0) : 0.13;
+    final target = !active
+        ? 0.04
+        : (widget.isPlaying ? widget.energy.clamp(0.0, 1.0) : 0.25);
     _energyShown += (target - _energyShown) * (dt * 3).clamp(0.0, 1.0);
     _frame.value++;
   }
@@ -218,6 +226,7 @@ class _VibeWaveBackgroundState extends State<VibeWaveBackground>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _stopTimer?.cancel();
     _ticker?.dispose();
     _frame.dispose();
     super.dispose();
@@ -316,6 +325,9 @@ class _VibePainter extends CustomPainter {
       final phase = (t * bpm / 60.0) % 1.0;
       final s = math.sin(math.pi * phase);
       beat = (s * s).clamp(0.0, 1.0) * (0.35 + 0.65 * energy);
+    } else {
+      // На паузе — мягкий «дыхательный» пульс, чтобы фон не казался неподвижным.
+      beat = 0.14 + 0.10 * (0.5 + 0.5 * math.sin(fragTime * 1.4));
     }
 
     final bg = dark ? const Color(0xFF141A26) : const Color(0xFFF0F0F5);
@@ -333,8 +345,8 @@ class _VibePainter extends CustomPainter {
     shader.setFloat(i++, shape.softness);
     shader.setFloat(i++, scaleMul);
     shader.setFloat(i++, shape.rays);
-    shader.setFloat(i++,
-        baseNeon * shape.neonMul * neonMul * (darkCover ? 0.6 : 1.0));
+    shader.setFloat(
+        i++, baseNeon * shape.neonMul * neonMul * (darkCover ? 0.6 : 1.0));
     shader.setFloat(i++, shape.bend);
     shader.setFloat(i++, energy);
     shader.setFloat(i++, beat);
@@ -342,10 +354,20 @@ class _VibePainter extends CustomPainter {
     shader.setFloat(i++, mood == WaveMood.fire ? 0.85 : 0.0);
 
     canvas.drawRect(
-        Rect.fromLTWH(0, 0, size.width, size.height),
-        Paint()..shader = shader);
+        Rect.fromLTWH(0, 0, size.width, size.height), Paint()..shader = shader);
+    // Каждый кадр создаёт новый FragmentShader — без dispose копится GPU-
+    // память, отсюда OOM и зависания после нескольких минут анимации.
+    shader.dispose();
   }
 
   @override
-  bool shouldRepaint(covariant _VibePainter old) => false;
+  bool shouldRepaint(covariant _VibePainter old) =>
+      fragTime != old.fragTime ||
+      accent != old.accent ||
+      genre != old.genre ||
+      energy != old.energy ||
+      bpm != old.bpm ||
+      playing != old.playing ||
+      dark != old.dark ||
+      like != old.like;
 }

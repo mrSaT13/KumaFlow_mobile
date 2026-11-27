@@ -13,12 +13,16 @@ import 'package:flutter/material.dart';
 /// Вне экрана (скролл) и в фоне тикеры стопаются полностью.
 class MyWaveDancingBlobs extends StatefulWidget {
   final List<Color> genreColors;
+
   /// BPM текущего трека (60..200, фолбек 120).
   final double bpm;
+
   /// 0..1 — глубина пульса.
   final double energy;
+
   /// 0..1 — лёгкое расширение пульса.
   final double danceability;
+
   /// false = плавное затухание + freeze (как пауза на ПК).
   final bool isPlaying;
 
@@ -47,17 +51,26 @@ class _MyWaveDancingBlobsState extends State<MyWaveDancingBlobs>
   bool _appActive = true;
   bool _wantDrift = true;
 
-  static const double _kRestAmp = 0.06;
+  // На паузе фон не замирает полностью: медленный дрейф как живой hero на ПК.
+  static const double _kRestAmp = 0.22;
 
   @override
   void initState() {
     super.initState();
     _colors = widget.genreColors.length >= 2
         ? widget.genreColors
-        : [const Color(0xFF7C3AED), const Color(0xFF06B6D4), const Color(0xFFF59E0B)];
+        : [
+            const Color(0xFF7C3AED),
+            const Color(0xFF06B6D4),
+            const Color(0xFFF59E0B)
+          ];
     // Slow 8s loop for large blobs, fast 6s for medium
-    _slow = AnimationController(vsync: this, duration: const Duration(milliseconds: 8200))..repeat();
-    _fast = AnimationController(vsync: this, duration: const Duration(milliseconds: 6100))..repeat();
+    _slow = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 8200))
+      ..repeat();
+    _fast = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 6100))
+      ..repeat();
     // Стартуем «тихо» и разгоняемся — без резкого рывка при появлении hero.
     _ramp = AnimationController(
       vsync: this,
@@ -68,15 +81,9 @@ class _MyWaveDancingBlobsState extends State<MyWaveDancingBlobs>
     );
     _ramp.addListener(_onRampTick);
     WidgetsBinding.instance.addObserver(this);
-    _wantDrift = widget.isPlaying;
-    if (!_wantDrift) {
-      // Пауза с первого кадра: тикеры остановит _onRampTick (уже на дне).
-      _slow.stop();
-      _fast.stop();
-    } else {
-      // ignore: discarded_futures
-      _ramp.animateTo(1.0, curve: Curves.easeOut);
-    }
+    _wantDrift = true; // дрейф не останавливаем даже на паузе
+    // ignore: discarded_futures
+    _ramp.animateTo(widget.isPlaying ? 1.0 : _kRestAmp, curve: Curves.easeOut);
   }
 
   @override
@@ -85,7 +92,11 @@ class _MyWaveDancingBlobsState extends State<MyWaveDancingBlobs>
     if (oldWidget.genreColors != widget.genreColors) {
       _colors = widget.genreColors.length >= 2
           ? widget.genreColors
-          : [const Color(0xFF7C3AED), const Color(0xFF06B6D4), const Color(0xFFF59E0B)];
+          : [
+              const Color(0xFF7C3AED),
+              const Color(0xFF06B6D4),
+              const Color(0xFFF59E0B)
+            ];
     }
     if (oldWidget.isPlaying != widget.isPlaying) _applyTargets();
     // bpm/energy применяются сами (фаза от часов — разрывов нет).
@@ -102,7 +113,7 @@ class _MyWaveDancingBlobsState extends State<MyWaveDancingBlobs>
 
   void _applyTargets() {
     if (!_visible || !_appActive) {
-      // Вне экрана / фон: тихо гаснем, дрейф встанет по _onRampTick.
+      // Вне экрана / фон: гасим амплитуду и останавливаем тикеры.
       _wantDrift = false;
       // ignore: discarded_futures
       _ramp.animateTo(_kRestAmp,
@@ -119,8 +130,10 @@ class _MyWaveDancingBlobsState extends State<MyWaveDancingBlobs>
       _ramp.animateTo(1.0,
           duration: const Duration(milliseconds: 1000), curve: Curves.easeOut);
     } else {
-      // Пауза как на ПК: затухание ~0.7с, потом freeze (0 затрат).
-      _wantDrift = false;
+      // Пауза: амплитуда падает до медленного дрейфа, но анимация живая.
+      _wantDrift = true;
+      if (!_slow.isAnimating) _slow.repeat();
+      if (!_fast.isAnimating) _fast.repeat();
       // ignore: discarded_futures
       _ramp.animateTo(_kRestAmp,
           duration: const Duration(milliseconds: 700), curve: Curves.easeInOut);
@@ -129,9 +142,7 @@ class _MyWaveDancingBlobsState extends State<MyWaveDancingBlobs>
 
   void _onRampTick() {
     // Огибающая села на дно и дрейф не нужен — стопаем тикеры (статика).
-    if (!_ramp.isAnimating &&
-        _ramp.value <= _kRestAmp + 0.001 &&
-        !_wantDrift) {
+    if (!_ramp.isAnimating && _ramp.value <= _kRestAmp + 0.001 && !_wantDrift) {
       if (_slow.isAnimating) _slow.stop();
       if (_fast.isAnimating) _fast.stop();
     }
@@ -227,9 +238,11 @@ class _BlobsPainter extends CustomPainter {
     if (w <= 0 || h <= 0) return;
 
     // Base — тёмная подложка как на картинке Яндекс (глубокий фиолетовый/синий)
-    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), Paint()..color = const Color(0xFF0D0A1A));
+    canvas.drawRect(
+        Rect.fromLTWH(0, 0, w, h), Paint()..color = const Color(0xFF0D0A1A));
 
-    void drawBlob(Offset center, double radius, Color color, double alpha, double blur) {
+    void drawBlob(
+        Offset center, double radius, Color color, double alpha, double blur) {
       final paint = Paint()
         ..color = color.withValues(alpha: alpha)
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, blur);
@@ -250,10 +263,12 @@ class _BlobsPainter extends CustomPainter {
     final pulse = 1.0 + depth * beat;
     final cx = w * (0.52 + 0.08 * drift * sin(slowT * 2 * pi));
     final cy = h * (0.50 + 0.07 * drift * cos(fastT * 2 * pi));
-    drawBlob(Offset(cx, cy), w * 0.62 * pulse, cCenter, (0.95 - 0.12 * beat).clamp(0.0, 1.0), 32);
+    drawBlob(Offset(cx, cy), w * 0.62 * pulse, cCenter,
+        (0.95 - 0.12 * beat).clamp(0.0, 1.0), 32);
 
     // Оранжевый ореол вокруг жёлтого
-    drawBlob(Offset(cx + w * 0.04, cy - h * 0.02), w * 0.45 * pulse, const Color(0xFFFF8A00), 0.55, 36);
+    drawBlob(Offset(cx + w * 0.04, cy - h * 0.02), w * 0.45 * pulse,
+        const Color(0xFFFF8A00), 0.55, 36);
 
     // Фиолетовый левый край
     final p1x = w * (0.12 + 0.10 * drift * sin(slowT * 2 * pi + 0.5));
@@ -271,8 +286,19 @@ class _BlobsPainter extends CustomPainter {
     drawBlob(Offset(p3x, p3y), w * 0.32, cPink, 0.60, 30);
 
     // Жанровый акцент — небольшой, чтобы Моя волна подстраивалась под вкус
-    drawBlob(Offset(w * 0.22 + w * 0.05 * drift * cos(fastT * 2 * pi), h * 0.82 + h * 0.04 * drift * sin(slowT * 2 * pi)), w * 0.18, g0, 0.45, 22);
-    drawBlob(Offset(w * 0.75 + w * 0.04 * drift * sin(slowT * 2 * pi), h * 0.22), w * 0.14, g1, 0.35, 20);
+    drawBlob(
+        Offset(w * 0.22 + w * 0.05 * drift * cos(fastT * 2 * pi),
+            h * 0.82 + h * 0.04 * drift * sin(slowT * 2 * pi)),
+        w * 0.18,
+        g0,
+        0.45,
+        22);
+    drawBlob(
+        Offset(w * 0.75 + w * 0.04 * drift * sin(slowT * 2 * pi), h * 0.22),
+        w * 0.14,
+        g1,
+        0.35,
+        20);
   }
 
   @override

@@ -35,10 +35,13 @@ class KumaHeroV2 extends StatefulWidget {
   final String? coverUrl;
   final bool isTv;
   final int filtersVersion;
+
   /// Генерация волны в полёте: вместо play рисуем спиннер (как на ПК).
   final bool isGenerating;
+
   /// Сырой coverArt ИГРАЮЩЕГО трека (не URL пула): трио идёт от него.
   final String? currentCoverArt;
+
   /// Жанр ИГРАЮЩЕГО трека: второй в цепочке ПК после акцента обложки.
   final String? currentGenre;
 
@@ -87,13 +90,12 @@ class _KumaHeroV2State extends State<KumaHeroV2> {
     final raw = (widget.currentCoverArt ?? '').trim();
     if (raw.isNotEmpty) {
       if (raw.startsWith('http')) {
-        return ResizeImage(NetworkImage(raw),
-            width: 48, height: 48);
+        return ResizeImage(NetworkImage(raw), width: 48, height: 48);
       }
       if (raw.startsWith('abs:')) {
         try {
-          final u = AudiobookshelfService()
-              .getCoverUrl(raw.substring(4), width: 96);
+          final u =
+              AudiobookshelfService().getCoverUrl(raw.substring(4), width: 96);
           final headers = AudiobookshelfService().authHeaders;
           return ResizeImage(
               NetworkImage(u, headers: headers.isEmpty ? null : headers),
@@ -103,13 +105,11 @@ class _KumaHeroV2State extends State<KumaHeroV2> {
       }
       if (isLocalFilePath(raw)) {
         try {
-          return ResizeImage(FileImage(File(raw)),
-              width: 48, height: 48);
+          return ResizeImage(FileImage(File(raw)), width: 48, height: 48);
         } catch (_) {}
       }
       try {
-        final svc =
-            Provider.of<SubsonicService>(context, listen: false);
+        final svc = Provider.of<SubsonicService>(context, listen: false);
         final u = svc.getCoverArtUrl(raw, size: 200);
         if (u.isNotEmpty && u.startsWith('http')) {
           return ResizeImage(NetworkImage(u), width: 48, height: 48);
@@ -164,8 +164,7 @@ class _KumaHeroV2State extends State<KumaHeroV2> {
         maximumColorCount: 8,
         size: const Size(48, 48),
       ).timeout(const Duration(seconds: 6));
-      final base =
-          palette.vibrantColor?.color ?? palette.dominantColor?.color;
+      final base = palette.vibrantColor?.color ?? palette.dominantColor?.color;
       if (base != null) {
         _baseCache[src] = base;
         if (_baseCache.length > 50) {
@@ -232,12 +231,10 @@ class _KumaHeroV2State extends State<KumaHeroV2> {
   Future<void> _loadResume() async {
     KumaFlowBrainResume? info;
     try {
-      final bridge =
-          Provider.of<KumaFlowBrainBridge>(context, listen: false);
+      final bridge = Provider.of<KumaFlowBrainBridge>(context, listen: false);
       if (bridge.isActive) {
-        info = await bridge
-            .fetchResumeInfo()
-            .timeout(const Duration(seconds: 7));
+        info =
+            await bridge.fetchResumeInfo().timeout(const Duration(seconds: 7));
       }
     } catch (_) {
       info = null;
@@ -294,8 +291,8 @@ class _KumaHeroV2State extends State<KumaHeroV2> {
     final trio =
         buildWaveTrio(_coverBase, isDark) ?? genreTrio ?? defaultWaveTrio;
     final poolMood = _poolMood();
-    final isLandscape =
-        !widget.isTv && MediaQuery.of(context).orientation == Orientation.landscape;
+    final isLandscape = !widget.isTv &&
+        MediaQuery.of(context).orientation == Orientation.landscape;
     final double cardHeight = widget.isTv ? 360 : (isLandscape ? 180 : 320);
 
     return Container(
@@ -340,14 +337,13 @@ class _KumaHeroV2State extends State<KumaHeroV2> {
                   final curMood = (curGenre != null && curGenre.isNotEmpty)
                       ? waveMoodForGenre(curGenre)
                       : WaveMood.none;
-                  final mood =
-                      curMood != WaveMood.none ? curMood : poolMood;
+                  final mood = curMood != WaveMood.none ? curMood : poolMood;
                   return ValueListenableBuilder<int>(
-                    valueListenable: PlayerUiSettingsService()
-                        .waveFxVersionNotifier,
+                    valueListenable:
+                        PlayerUiSettingsService().waveFxVersionNotifier,
                     builder: (_, __, ___) => ValueListenableBuilder<String>(
-                      valueListenable: PlayerUiSettingsService()
-                          .homeMyWaveVariantNotifier,
+                      valueListenable:
+                          PlayerUiSettingsService().homeMyWaveVariantNotifier,
                       builder: (_, variant, ___) {
                         // V1 — статичный фон (для слабых): тикер стоит.
                         if (variant == 'v1') {
@@ -397,8 +393,8 @@ class _KumaHeroV2State extends State<KumaHeroV2> {
                           dark: isDark,
                           trio: trio,
                           mood: mood,
-                          enabledFx: PlayerUiSettingsService()
-                              .getWaveFxEnabled(),
+                          enabledFx:
+                              PlayerUiSettingsService().getWaveFxEnabled(),
                         );
                       },
                     ),
@@ -412,8 +408,8 @@ class _KumaHeroV2State extends State<KumaHeroV2> {
                 children: [
                   if (widget.songs.isNotEmpty)
                     ValueListenableBuilder<bool>(
-                      valueListenable: PlayerUiSettingsService()
-                          .homeMyWaveShowCountNotifier,
+                      valueListenable:
+                          PlayerUiSettingsService().homeMyWaveShowCountNotifier,
                       builder: (_, showCount, ___) {
                         if (!showCount) return const SizedBox.shrink();
                         return Align(
@@ -575,8 +571,7 @@ class _KumaHeroV2State extends State<KumaHeroV2> {
                         ),
                         if (_filters.isNotEmpty)
                           Container(
-                            constraints:
-                                const BoxConstraints(maxWidth: 220),
+                            constraints: const BoxConstraints(maxWidth: 220),
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 14, vertical: 9),
                             decoration: BoxDecoration(
@@ -609,8 +604,7 @@ class _KumaHeroV2State extends State<KumaHeroV2> {
                                     padding: const EdgeInsets.all(4),
                                     child: Icon(
                                       Icons.close_rounded,
-                                      color:
-                                          pillFg.withValues(alpha: 0.6),
+                                      color: pillFg.withValues(alpha: 0.6),
                                       size: 15,
                                     ),
                                   ),
@@ -645,9 +639,9 @@ class _KumaHeroV2State extends State<KumaHeroV2> {
               return const SizedBox.shrink();
             }
             try {
-              final own = Provider.of<KumaFlowBrainBridge>(context,
-                      listen: false)
-                  .ownDeviceId;
+              final own =
+                  Provider.of<KumaFlowBrainBridge>(context, listen: false)
+                      .ownDeviceId;
               if (own != null &&
                   own.isNotEmpty &&
                   r.deviceId.isNotEmpty &&
@@ -655,27 +649,23 @@ class _KumaHeroV2State extends State<KumaHeroV2> {
                 return const SizedBox.shrink();
               }
             } catch (_) {}
-            final isDark =
-                Theme.of(context).brightness == Brightness.dark;
+            final isDark = Theme.of(context).brightness == Brightness.dark;
             final title = r.title.isNotEmpty ? r.title : 'трек';
             final from = r.fromLabel.isNotEmpty ? ' с ${r.fromLabel}' : '';
             return Container(
               constraints: const BoxConstraints(maxWidth: 320),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: isDark
                     ? Colors.black.withValues(alpha: 0.35)
                     : Colors.white.withValues(alpha: 0.75),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                    color: pillFg.withValues(alpha: 0.25)),
+                border: Border.all(color: pillFg.withValues(alpha: 0.25)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.play_circle_fill_rounded,
-                      color: pillFg, size: 18),
+                  Icon(Icons.play_circle_fill_rounded, color: pillFg, size: 18),
                   const SizedBox(width: 6),
                   Flexible(
                     child: GestureDetector(

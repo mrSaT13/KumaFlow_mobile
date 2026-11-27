@@ -60,7 +60,9 @@ class _SettingsServerTabState extends State<SettingsServerTab> {
               icon: CupertinoIcons.link,
               iconColor: const Color(0xFF007AFF),
               title: l10n.serverUrl,
-              subtitle: authProvider.config?.serverUrl ?? l10n.notConnected,
+              subtitle: authProvider.config?.effectiveUrl ??
+                  authProvider.config?.serverUrl ??
+                  l10n.notConnected,
             ),
             _buildDivider(),
             _buildInfoTile(
@@ -70,7 +72,7 @@ class _SettingsServerTabState extends State<SettingsServerTab> {
               subtitle: authProvider.config?.username ?? l10n.unknown,
             ),
             _buildDivider(),
-            _buildSmartConnectTile(),
+            _buildServerUrlsTile(),
           ],
         ),
         const SizedBox(height: 24),
@@ -183,11 +185,22 @@ class _SettingsServerTabState extends State<SettingsServerTab> {
     );
   }
 
-  /// Smart Connect: домашний LAN-URL + автопобеда быстрейшего.
-  /// Дома ходим напрямую (без KeenDNS-hairpin), снаружи — по основному.
-  Widget _buildSmartConnectTile() {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    final lan = (auth.config?.localUrl ?? '').trim();
+  /// Адреса сервера: основной + запасные (аналог переключения домена).
+  /// Активный отмечен галочкой, при открытии адреса пингуются автоматически.
+  Widget _buildServerUrlsTile() {
+    final auth = Provider.of<AuthProvider>(context);
+    final config = auth.config;
+    final backups = config?.backupUrls ?? const <String>[];
+    final active = (config?.activeUrl ?? '').trim();
+    final primary = config?.serverUrl ?? '';
+    final String subtitle;
+    if (backups.isEmpty) {
+      subtitle = 'Только основной адрес';
+    } else if (active.isNotEmpty) {
+      subtitle = 'Активен запасной\nЗапасных: ${backups.length}';
+    } else {
+      subtitle = 'Активен основной: $primary\nЗапасных: ${backups.length}';
+    }
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Container(
@@ -197,15 +210,12 @@ class _SettingsServerTabState extends State<SettingsServerTab> {
           color: const Color(0xFF4E8CA8).withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const Icon(CupertinoIcons.house_fill,
+        child: const Icon(CupertinoIcons.arrow_swap,
             color: Color(0xFF4E8CA8), size: 18),
       ),
-      title: const Text('Smart Connect · домашний URL',
-          style: TextStyle(fontSize: 16)),
+      title: const Text('Адреса сервера', style: TextStyle(fontSize: 16)),
       subtitle: Text(
-        lan.isEmpty
-            ? 'Не задан — подключение только по основному URL'
-            : 'LAN: $lan · активен: ${auth.config?.serverUrl ?? ''}',
+        subtitle,
         style: TextStyle(
           fontSize: 13,
           color: _isDark
@@ -216,53 +226,23 @@ class _SettingsServerTabState extends State<SettingsServerTab> {
         overflow: TextOverflow.ellipsis,
       ),
       trailing: const Icon(CupertinoIcons.chevron_right, size: 16),
-      onTap: () => _editSmartConnectLan(),
+      onTap: _openServerUrlsDialog,
     );
   }
 
-  Future<void> _editSmartConnectLan() async {
+  Future<void> _openServerUrlsDialog() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
-    final ctrl = TextEditingController(text: auth.config?.localUrl ?? '');
-    final res = await showDialog<String>(
+    await showDialog<void>(
       context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Домашний URL (LAN)'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: ctrl,
-              keyboardType: TextInputType.url,
-              decoration: const InputDecoration(
-                  hintText: 'http://192.168.1.10:4533'),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Дома приложение пойдёт напрямую (быстро, без KeenDNS), снаружи — по основному URL. Пусто = выключено.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(c),
-              child: const Text('Отмена')),
-          FilledButton(
-              onPressed: () => Navigator.pop(c, ctrl.text.trim()),
-              child: const Text('Сохранить')),
-        ],
+      builder: (ctx) => _ServerUrlsDialog(
+        auth: auth,
+        isDark: _isDark,
       ),
     );
-    ctrl.dispose();
-    if (res == null || !mounted) return;
-    try {
-      await auth.setLocalUrl(res);
-    } catch (_) {}
     if (mounted) setState(() {});
   }
-
-  Widget _buildMusicFoldersButton() {    return ListTile(
+  Widget _buildMusicFoldersButton() {
+    return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Container(
         width: 32,
@@ -590,6 +570,339 @@ class _SettingsServerTabState extends State<SettingsServerTab> {
     );
   }
 }
+class _ServerUrlsDialog extends StatefulWidget {
+  final AuthProvider auth;
+  final bool isDark;
+  const _ServerUrlsDialog({required this.auth, required this.isDark});
+
+  @override
+  State<_ServerUrlsDialog> createState() => _ServerUrlsDialogState();
+}
+
+class _ServerUrlsDialogState extends State<_ServerUrlsDialog> {
+  Map<String, bool?> _status = {};
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pingAll();
+  }
+
+  ServerConfig? get _config => widget.auth.config;
+
+  List<String> _urls() {
+    final c = _config;
+    if (c == null) return const [];
+    final list = <String>[c.serverUrl.trim(), ...c.backupUrls];
+    final seen = <String>{};
+    return [
+      for (final u in list)
+        if (u.trim().isNotEmpty && seen.add(u.trim())) u.trim()
+    ];
+  }
+
+  String _active() {
+    final c = _config;
+    if (c == null) return '';
+    final a = (c.activeUrl ?? '').trim();
+    return a.isEmpty ? c.serverUrl.trim() : a;
+  }
+
+  Future<void> _pingAll() async {
+    final urls = _urls();
+    setState(() {
+      _status = {for (final u in urls) u: null};
+    });
+    await Future.wait(urls.map((u) async {
+      final ok = await widget.auth.pingServerUrl(u);
+      if (!mounted) return;
+      setState(() => _status[u] = ok);
+    }));
+  }
+
+  Future<void> _switchTo(String url) async {
+    if (_busy) return;
+    if (url == _active()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Этот адрес уже активен')),
+        );
+      }
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final ok = await widget.auth.switchActiveServerUrl(url);
+      if (!mounted) return;
+      if (ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Переключено на $url')),
+        );
+        setState(() {});
+        await _pingAll();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Не удалось переключиться: ${widget.auth.lastError ?? "сервер недоступен"}',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _addUrl() async {
+    final ctrl = TextEditingController();
+    final res = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Добавить запасной URL'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: ctrl,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(
+                hintText: 'https://backup.example.com',
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Адрес того же сервера (другой домен/порт, reverse proxy). '
+              'Можно указать порт, напр. https://домен:8443',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, ctrl.text.trim()),
+            child: const Text('Добавить'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (res == null || res.isEmpty || !mounted) return;
+    await widget.auth.addBackupServerUrl(res);
+    if (mounted) {
+      setState(() {});
+      await _pingAll();
+    }
+  }
+
+  Future<String?> _pickBackup(String title) async {
+    final backups = _config?.backupUrls ?? const <String>[];
+    if (backups.isEmpty) return null;
+    if (backups.length == 1) return backups.first;
+    return showDialog<String>(
+      context: context,
+      builder: (c) => SimpleDialog(
+        title: Text(title),
+        children: [
+          for (final u in backups)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(c, u),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(u),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _editUrl() async {
+    final target = await _pickBackup('Изменить запасной URL');
+    if (target == null || !mounted) return;
+    final ctrl = TextEditingController(text: target);
+    final res = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Изменить запасной URL'),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.url,
+          decoration: const InputDecoration(
+            hintText: 'https://backup.example.com',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, ctrl.text.trim()),
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (res == null || res.isEmpty || !mounted) return;
+    await widget.auth.updateBackupServerUrl(target, res);
+    if (mounted) {
+      setState(() {});
+      await _pingAll();
+    }
+  }
+
+  Future<void> _deleteUrl() async {
+    final target = await _pickBackup('Удалить запасной URL');
+    if (target == null || !mounted) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Удалить запасной URL?'),
+        content: Text(target),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFFF3B30),
+            ),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    await widget.auth.removeBackupServerUrl(target);
+    if (mounted) {
+      setState(() {});
+      await _pingAll();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final urls = _urls();
+    final active = _active();
+    final primary = _config?.serverUrl.trim() ?? '';
+    final hasBackups = (_config?.backupUrls ?? const []).isNotEmpty;
+
+    return AlertDialog(
+      title: const Text('Адреса сервера'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (urls.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text('Нет адресов'),
+              )
+            else
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 320),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: urls.length,
+                  itemBuilder: (context, i) {
+                    final url = urls[i];
+                    final isActive = url == active;
+                    final st = _status[url];
+                    final isPrimary = url == primary;
+                    final label = isPrimary ? 'Основной' : 'Запасной';
+                    final statusText = st == null
+                        ? 'проверяется…'
+                        : st
+                            ? 'доступен'
+                            : 'нет ответа';
+                    return ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        isActive
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        color: isActive
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
+                      ),
+                      title: Text(
+                        '$label${isActive ? ' ✓' : ''}',
+                        style: TextStyle(
+                          fontWeight:
+                              isActive ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '$url\n$statusText',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: st == false ? Colors.orange : null,
+                        ),
+                      ),
+                      isThreeLine: true,
+                      onTap: _busy ? null : () => _switchTo(url),
+                    );
+                  },
+                ),
+              ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                TextButton.icon(
+                  onPressed: _busy ? null : _addUrl,
+                  icon: const Icon(Icons.add_link, size: 18),
+                  label: const Text('Добавить'),
+                ),
+                if (hasBackups)
+                  TextButton.icon(
+                    onPressed: _busy ? null : _editUrl,
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Изменить'),
+                  ),
+                if (hasBackups)
+                  TextButton.icon(
+                    onPressed: _busy ? null : _deleteUrl,
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    label: const Text('Удалить'),
+                  ),
+                TextButton.icon(
+                  onPressed: _busy ? null : _pingAll,
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('Проверить'),
+                ),
+              ],
+            ),
+            if (_busy)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: LinearProgressIndicator(),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.pop(context),
+          child: const Text('Закрыть'),
+        ),
+      ],
+    );
+  }
+}
 
 class _AudiobookshelfSettingsTile extends StatefulWidget {
   final bool isDark;
@@ -809,3 +1122,4 @@ class _MusicFoldersDialogState extends State<_MusicFoldersDialog> {
     );
   }
 }
+

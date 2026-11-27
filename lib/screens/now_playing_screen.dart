@@ -2829,6 +2829,7 @@ class _SongInfoState extends State<_SongInfo> {
                         tracks.first,
                         playlist: tracks,
                         startIndex: 0,
+                        playlistName: 'Микс по треку: ${song.title}',
                       );
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(

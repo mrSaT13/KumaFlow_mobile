@@ -52,7 +52,9 @@ class _SearchScreenState extends State<SearchScreen> {
   void initState() {
     super.initState();
     _liveSearch = PlayerUiSettingsService().getLiveSearch();
-    PlayerUiSettingsService().liveSearchNotifier.addListener(_onLiveSearchChanged);
+    PlayerUiSettingsService()
+        .liveSearchNotifier
+        .addListener(_onLiveSearchChanged);
   }
 
   void _onLiveSearchChanged() {
@@ -63,7 +65,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
-    PlayerUiSettingsService().liveSearchNotifier.removeListener(_onLiveSearchChanged);
+    PlayerUiSettingsService()
+        .liveSearchNotifier
+        .removeListener(_onLiveSearchChanged);
     _searchController.dispose();
     _focusNode.dispose();
     _debounceTimer?.cancel();
@@ -152,41 +156,60 @@ class _SearchScreenState extends State<SearchScreen> {
       _showSuggestions = false;
     });
 
+    final libraryProvider = Provider.of<LibraryProvider>(
+      context,
+      listen: false,
+    );
+    final podcastProvider =
+        Provider.of<PodcastProvider>(context, listen: false);
+
+    // Музыка — главный результат. Раньше все три источника ждали друг друга
+    // в Future.wait: падение/тормоз Audiobookshelf скрывало треки и альбомы,
+    // и оставались только подкасты. Теперь каждый источник независим.
     try {
-      final libraryProvider = Provider.of<LibraryProvider>(
-        context,
-        listen: false,
-      );
-      final podcastProvider = Provider.of<PodcastProvider>(context, listen: false);
-      final absFuture = AudiobookshelfService().isConfigured
-          ? AudiobookshelfService().searchBooks(query)
-          : Future.value(<Map<String, dynamic>>[]);
-      final results = await Future.wait([
-        libraryProvider.search(query),
-        absFuture,
-        podcastProvider.search(query),
-      ]);
-      final result = results[0] as SearchResult;
-      final books = results[1] as List<Map<String, dynamic>>;
+      final result = await libraryProvider.search(query);
       if (mounted && _query == query) {
-        setState(() {
-          _searchResult = result;
-          _bookResults = books;
-          _isSearching = false;
-        });
+        setState(() => _searchResult = result);
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isSearching = false;
-        });
+      debugPrint('[Search] music search failed: $e');
+      if (mounted && _query == query) {
+        setState(() => _searchResult = SearchResult(
+              artists: const [],
+              albums: const [],
+              songs: const [],
+            ));
       }
+    }
+
+    if (AudiobookshelfService().isConfigured) {
+      try {
+        final books = await AudiobookshelfService().searchBooks(query);
+        if (mounted && _query == query) {
+          setState(() => _bookResults = books);
+        }
+      } catch (e) {
+        debugPrint('[Search] audiobookshelf failed: $e');
+      }
+    } else {
+      if (mounted && _query == query) setState(() => _bookResults = const []);
+    }
+
+    try {
+      await podcastProvider.search(query);
+    } catch (e) {
+      debugPrint('[Search] podcasts failed: $e');
+    }
+
+    if (mounted) {
+      setState(() => _isSearching = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final intensity = context.select<ThemeService, double>((t) => t.gradientIntensity);
+    final intensity =
+        context.select<ThemeService, double>((t) => t.gradientIntensity);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final accentColor =
@@ -219,8 +242,10 @@ class _SearchScreenState extends State<SearchScreen> {
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            accentColor.withValues(alpha: (isDark ? 0.40 : 0.20) * intensity),
-                            accentColor.withValues(alpha: (isDark ? 0.16 : 0.08) * intensity),
+                            accentColor.withValues(
+                                alpha: (isDark ? 0.40 : 0.20) * intensity),
+                            accentColor.withValues(
+                                alpha: (isDark ? 0.16 : 0.08) * intensity),
                             (isDark ? Colors.black : Colors.white)
                                 .withValues(alpha: 0.0),
                           ],
@@ -242,8 +267,8 @@ class _SearchScreenState extends State<SearchScreen> {
                             letterSpacing: -0.3,
                             shadows: [
                               Shadow(
-                                color: Colors.black.withValues(
-                                    alpha: isDark ? 0.55 : 0.18),
+                                color: Colors.black
+                                    .withValues(alpha: isDark ? 0.55 : 0.18),
                                 blurRadius: 12,
                                 offset: const Offset(0, 1),
                               ),
@@ -265,11 +290,11 @@ class _SearchScreenState extends State<SearchScreen> {
                       focusNode: _focusNode,
                       placeholder: AppLocalizations.of(
                         context,
-                      )!.searchPlaceholder,
+                      )!
+                          .searchPlaceholder,
                       style: theme.textTheme.bodyLarge,
-                      backgroundColor: isDark
-                          ? AppTheme.darkCard
-                          : AppTheme.lightBackground,
+                      backgroundColor:
+                          isDark ? AppTheme.darkCard : AppTheme.lightBackground,
                       onChanged: _onSearchChanged,
                       onSubmitted: (value) {
                         setState(() => _showSuggestions = false);
@@ -318,17 +343,25 @@ class _SearchScreenState extends State<SearchScreen> {
                     ],
                   ),
                 )
-              else if ((_searchResult != null && !_searchResult!.isEmpty) || _bookResults.isNotEmpty || context.select<PodcastProvider, bool>((p) => p.searchResults.isNotEmpty))
+              else if ((_searchResult != null && !_searchResult!.isEmpty) ||
+                  _bookResults.isNotEmpty ||
+                  context.select<PodcastProvider, bool>(
+                      (p) => p.searchResults.isNotEmpty))
                 SliverToBoxAdapter(
                   child: Column(
                     children: [
-                      if (_searchResult != null && !_searchResult!.isEmpty) _buildSearchResults(),
+                      if (_searchResult != null && !_searchResult!.isEmpty)
+                        _buildSearchResults(),
                       _buildPodcastSearchResults(),
                       if (_bookResults.isNotEmpty) _buildBookResults(),
                     ],
                   ),
                 )
-              else if (_query.isNotEmpty && _searchResult?.isEmpty == true && _bookResults.isEmpty && context.select<PodcastProvider, bool>((p) => p.searchResults.isEmpty))
+              else if (_query.isNotEmpty &&
+                  _searchResult?.isEmpty == true &&
+                  _bookResults.isEmpty &&
+                  context.select<PodcastProvider, bool>(
+                      (p) => p.searchResults.isEmpty))
                 SliverFillRemaining(
                   child: Center(
                     child: Column(
@@ -359,7 +392,6 @@ class _SearchScreenState extends State<SearchScreen> {
                 SliverToBoxAdapter(child: _buildBrowseCategories()),
             ],
           ),
-          
           if (_showSuggestions && _searchController.text.isNotEmpty)
             Positioned(
               top: 120 + 56 + 8,
@@ -380,9 +412,7 @@ class _SearchScreenState extends State<SearchScreen> {
       children: [
         if (result.artists.isNotEmpty) ...[
           SectionHeader(title: AppLocalizations.of(context)!.artists),
-          ...result.artists
-              .take(5)
-              .map(
+          ...result.artists.take(5).map(
                 (artist) => ArtistTile(
                   artist: artist,
                   onTap: () => NavigationHelper.push(
@@ -393,7 +423,6 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
           const SizedBox(height: 16),
         ],
-
         if (result.albums.isNotEmpty) ...[
           HorizontalScrollSection(
             title: AppLocalizations.of(context)!.albums,
@@ -413,20 +442,18 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
           const SizedBox(height: 16),
         ],
-
         if (result.songs.isNotEmpty) ...[
           SectionHeader(title: AppLocalizations.of(context)!.songs),
           ...result.songs.asMap().entries.map(
-            (entry) => SongTile(
-              song: entry.value,
-              playlist: result.songs,
-              index: entry.key,
-              showArtist: true,
-              showAlbum: true,
-            ),
-          ),
+                (entry) => SongTile(
+                  song: entry.value,
+                  playlist: result.songs,
+                  index: entry.key,
+                  showArtist: true,
+                  showAlbum: true,
+                ),
+              ),
         ],
-
         const SizedBox(height: 150),
       ],
     );
@@ -440,12 +467,19 @@ class _SearchScreenState extends State<SearchScreen> {
         ..._bookResults.take(10).map((b) {
           final id = b['id'] as String? ?? '';
           final title = b['media']?['metadata']?['title'] ?? 'Unknown';
-          final author = b['media']?['metadata']?['authorName'] ?? b['media']?['metadata']?['author'] ?? '';
+          final author = b['media']?['metadata']?['authorName'] ??
+              b['media']?['metadata']?['author'] ??
+              '';
           return ListTile(
             leading: const Icon(Icons.menu_book_rounded),
             title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-            subtitle: Text(author, maxLines: 1, overflow: TextOverflow.ellipsis),
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AudiobookDetailScreen(itemId: id, initialData: b))),
+            subtitle:
+                Text(author, maxLines: 1, overflow: TextOverflow.ellipsis),
+            onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) =>
+                        AudiobookDetailScreen(itemId: id, initialData: b))),
           );
         }),
         const SizedBox(height: 16),
@@ -459,7 +493,11 @@ class _SearchScreenState extends State<SearchScreen> {
         if (pod.isSearching) {
           return const Padding(
             padding: EdgeInsets.all(16),
-            child: Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))),
+            child: Center(
+                child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2))),
           );
         }
         if (pod.searchResults.isEmpty) return const SizedBox.shrink();
@@ -472,23 +510,41 @@ class _SearchScreenState extends State<SearchScreen> {
                 leading: ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: r.artworkUrl.isNotEmpty
-                      ? Image.network(r.artworkUrl, width: 44, height: 44, fit: BoxFit.cover, errorBuilder: (c,u,e)=>Container(width:44,height:44,color: Colors.purple.shade100, child: const Icon(Icons.podcasts_rounded, size: 20)))
-                      : Container(width:44,height:44,color: Colors.purple.shade100, child: const Icon(Icons.podcasts_rounded, size: 20)),
+                      ? Image.network(r.artworkUrl,
+                          width: 44,
+                          height: 44,
+                          fit: BoxFit.cover,
+                          errorBuilder: (c, u, e) => Container(
+                              width: 44,
+                              height: 44,
+                              color: Colors.purple.shade100,
+                              child:
+                                  const Icon(Icons.podcasts_rounded, size: 20)))
+                      : Container(
+                          width: 44,
+                          height: 44,
+                          color: Colors.purple.shade100,
+                          child: const Icon(Icons.podcasts_rounded, size: 20)),
                 ),
-                title: Text(r.trackName, maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text(r.artistName, maxLines: 1, overflow: TextOverflow.ellipsis),
+                title: Text(r.trackName,
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                subtitle: Text(r.artistName,
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
                 trailing: IconButton(
                   icon: const Icon(Icons.add_rounded),
                   onPressed: () async {
                     final ok = await pod.addFeed(r.feedUrl);
                     if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok ? 'Подкаст добавлен' : pod.error ?? 'Ошибка')));
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(
+                            ok ? 'Подкаст добавлен' : pod.error ?? 'Ошибка')));
                   },
                 ),
                 onTap: () async {
                   // temporary podcast stub -> detail with feedUrl
                   final Podcast stub = r.toPodcastStub();
-                  NavigationHelper.push(context, PodcastDetailScreen(podcast: stub));
+                  NavigationHelper.push(
+                      context, PodcastDetailScreen(podcast: stub));
                 },
               );
             }),
@@ -658,157 +714,158 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               )
             : _autocompleteSuggestions == null ||
-                  _autocompleteSuggestions!.isEmpty
-            ? Padding(
-                padding: const EdgeInsets.all(24),
-                child: Center(
-                  child: Text(
-                    AppLocalizations.of(context)!.noSuggestions,
-                    style: TextStyle(
-                      color: AppTheme.lightSecondaryText,
-                      fontSize: 14,
+                    _autocompleteSuggestions!.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Center(
+                      child: Text(
+                        AppLocalizations.of(context)!.noSuggestions,
+                        style: TextStyle(
+                          color: AppTheme.lightSecondaryText,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  )
+                : SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_autocompleteSuggestions!.artists.isNotEmpty) ...[
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                            child: Text(
+                              AppLocalizations.of(context)!.artists,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.lightSecondaryText,
+                              ),
+                            ),
+                          ),
+                          ..._autocompleteSuggestions!.artists.map(
+                            (artist) => ListTile(
+                              dense: true,
+                              leading: Icon(
+                                CupertinoIcons.person,
+                                size: 20,
+                                color: AppTheme.appleMusicRed,
+                              ),
+                              title: Text(
+                                artist.name,
+                                style: const TextStyle(fontSize: 14),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              onTap: () {
+                                setState(() => _showSuggestions = false);
+                                NavigationHelper.push(
+                                  context,
+                                  ArtistScreen(artistId: artist.id),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                        if (_autocompleteSuggestions!.albums.isNotEmpty) ...[
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                            child: Text(
+                              AppLocalizations.of(context)!.albums,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.lightSecondaryText,
+                              ),
+                            ),
+                          ),
+                          ..._autocompleteSuggestions!.albums.map(
+                            (album) => ListTile(
+                              dense: true,
+                              leading: Icon(
+                                CupertinoIcons.music_albums,
+                                size: 20,
+                                color: AppTheme.appleMusicRed,
+                              ),
+                              title: Text(
+                                album.name,
+                                style: const TextStyle(fontSize: 14),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: album.artist != null
+                                  ? Text(
+                                      album.artist!,
+                                      style: const TextStyle(fontSize: 12),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    )
+                                  : null,
+                              onTap: () {
+                                setState(() => _showSuggestions = false);
+                                NavigationHelper.push(
+                                  context,
+                                  AlbumScreen(albumId: album.id),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                        if (_autocompleteSuggestions!.songs.isNotEmpty) ...[
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                            child: Text(
+                              AppLocalizations.of(context)!.songs,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.lightSecondaryText,
+                              ),
+                            ),
+                          ),
+                          ..._autocompleteSuggestions!.songs.map(
+                            (song) => ListTile(
+                              dense: true,
+                              leading: Icon(
+                                CupertinoIcons.music_note,
+                                size: 20,
+                                color: AppTheme.appleMusicRed,
+                              ),
+                              title: Text(
+                                song.title,
+                                style: const TextStyle(fontSize: 14),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: song.artist != null
+                                  ? Text(
+                                      song.artist!,
+                                      style: const TextStyle(fontSize: 12),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    )
+                                  : null,
+                              onTap: () {
+                                setState(() => _showSuggestions = false);
+                                final playerProvider =
+                                    Provider.of<PlayerProvider>(
+                                  context,
+                                  listen: false,
+                                );
+                                playerProvider.playSong(
+                                  song,
+                                  playlist: _autocompleteSuggestions!.songs,
+                                  startIndex: _autocompleteSuggestions!.songs
+                                      .indexOf(song),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                      ],
                     ),
                   ),
-                ),
-              )
-            : SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_autocompleteSuggestions!.artists.isNotEmpty) ...[
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                        child: Text(
-                          AppLocalizations.of(context)!.artists,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.lightSecondaryText,
-                          ),
-                        ),
-                      ),
-                      ..._autocompleteSuggestions!.artists.map(
-                        (artist) => ListTile(
-                          dense: true,
-                          leading: Icon(
-                            CupertinoIcons.person,
-                            size: 20,
-                            color: AppTheme.appleMusicRed,
-                          ),
-                          title: Text(
-                            artist.name,
-                            style: const TextStyle(fontSize: 14),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          onTap: () {
-                            setState(() => _showSuggestions = false);
-                            NavigationHelper.push(
-                              context,
-                              ArtistScreen(artistId: artist.id),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                    if (_autocompleteSuggestions!.albums.isNotEmpty) ...[
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                        child: Text(
-                          AppLocalizations.of(context)!.albums,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.lightSecondaryText,
-                          ),
-                        ),
-                      ),
-                      ..._autocompleteSuggestions!.albums.map(
-                        (album) => ListTile(
-                          dense: true,
-                          leading: Icon(
-                            CupertinoIcons.music_albums,
-                            size: 20,
-                            color: AppTheme.appleMusicRed,
-                          ),
-                          title: Text(
-                            album.name,
-                            style: const TextStyle(fontSize: 14),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: album.artist != null
-                              ? Text(
-                                  album.artist!,
-                                  style: const TextStyle(fontSize: 12),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                )
-                              : null,
-                          onTap: () {
-                            setState(() => _showSuggestions = false);
-                            NavigationHelper.push(
-                              context,
-                              AlbumScreen(albumId: album.id),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                    if (_autocompleteSuggestions!.songs.isNotEmpty) ...[
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                        child: Text(
-                          AppLocalizations.of(context)!.songs,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.lightSecondaryText,
-                          ),
-                        ),
-                      ),
-                      ..._autocompleteSuggestions!.songs.map(
-                        (song) => ListTile(
-                          dense: true,
-                          leading: Icon(
-                            CupertinoIcons.music_note,
-                            size: 20,
-                            color: AppTheme.appleMusicRed,
-                          ),
-                          title: Text(
-                            song.title,
-                            style: const TextStyle(fontSize: 14),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: song.artist != null
-                              ? Text(
-                                  song.artist!,
-                                  style: const TextStyle(fontSize: 12),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                )
-                              : null,
-                          onTap: () {
-                            setState(() => _showSuggestions = false);
-                            final playerProvider = Provider.of<PlayerProvider>(
-                              context,
-                              listen: false,
-                            );
-                            playerProvider.playSong(
-                              song,
-                              playlist: _autocompleteSuggestions!.songs,
-                              startIndex: _autocompleteSuggestions!.songs
-                                  .indexOf(song),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                  ],
-                ),
-              ),
       ),
     );
   }
@@ -821,7 +878,8 @@ class _CategoryItem {
   final VoidCallback onTap;
   final String? coverUrl;
 
-  _CategoryItem(this.title, this.icon, this.colors, this.onTap, {this.coverUrl});
+  _CategoryItem(this.title, this.icon, this.colors, this.onTap,
+      {this.coverUrl});
 }
 
 class _CategoryCard extends StatelessWidget {
@@ -835,9 +893,8 @@ class _CategoryCard extends StatelessWidget {
         (url.length > 2 && url[1] == ':') ||
         url.startsWith('file://');
     if (isFile) {
-      final path = url.startsWith('file://')
-          ? Uri.parse(url).toFilePath()
-          : url;
+      final path =
+          url.startsWith('file://') ? Uri.parse(url).toFilePath() : url;
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
         child: Image.file(
@@ -863,8 +920,7 @@ class _CategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasCover =
-        category.coverUrl != null && category.coverUrl!.isNotEmpty;
+    final hasCover = category.coverUrl != null && category.coverUrl!.isNotEmpty;
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(

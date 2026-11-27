@@ -236,18 +236,161 @@ class AuthProvider extends ChangeNotifier {
     retryConnection(silent: true);
   }
 
-  /// Smart Connect: задать/очистить домашний LAN-URL (пусто = выкл).
+  /// Совместимость: задать/очистить домашний LAN-URL (старый Smart Connect).
+  /// Теперь это первый запасной адрес в списке.
   Future<void> setLocalUrl(String raw) async {
     if (_config == null) return;
     final v = ServerConfig.normalizeOther(raw);
+    final backups = [..._config!.backupUrls];
+    final oldLocal = (_config!.localUrl ?? '').trim();
     if (v.isEmpty) {
-      _config = _config!.copyWith(clearLocalUrl: true);
+      if (oldLocal.isNotEmpty) {
+        backups.removeWhere((e) => e == oldLocal);
+      }
+      final wasActive = _config!.activeUrl == oldLocal;
+      _config = _config!.copyWith(
+        backupUrls: backups,
+        clearLocalUrl: true,
+        activeUrl: wasActive ? _config!.serverUrl : null,
+        clearActiveUrl: wasActive && _config!.serverUrl.isNotEmpty ? false : wasActive,
+      );
+      if (wasActive) {
+        _config = _config!.copyWith(clearActiveUrl: true);
+      }
     } else {
-      _config = _config!.copyWith(localUrl: v);
+      if (oldLocal.isNotEmpty) {
+        backups.removeWhere((e) => e == oldLocal);
+      }
+      if (!backups.contains(v)) backups.insert(0, v);
+      _config = _config!.copyWith(backupUrls: backups, localUrl: v);
     }
     await _storageService.saveServerConfig(_config!);
     await _storageService.saveProfile(_config!);
     notifyListeners();
+  }
+
+  /// Переключить активный адрес сервера (основной или запасной) с проверкой.
+  Future<bool> switchActiveServerUrl(String url) async {
+    if (_config == null) return false;
+    final target = url.trim();
+    if (target.isEmpty) return false;
+    final isPrimary = target == _config!.serverUrl ||
+        ServerConfig.normalizeServerUrl(target) ==
+            _config!.normalizedPrimaryUrl;
+    final candidate = _config!.copyWith(
+      activeUrl: isPrimary ? null : target,
+      clearActiveUrl: isPrimary,
+    );
+    final prev = _config;
+    _config = candidate;
+    await _subsonicService.configure(candidate);
+    final ping = await _subsonicService.pingWithError().timeout(
+          const Duration(seconds: 12),
+          onTimeout: () =>
+              PingResult(success: false, error: 'Connection timed out'),
+        );
+    if (!ping.success) {
+      _config = prev;
+      if (prev != null) await _subsonicService.configure(prev);
+      _lastError = ping.error;
+      notifyListeners();
+      return false;
+    }
+    await _storageService.saveServerConfig(_config!);
+    await _storageService.saveProfile(_config!);
+    _lastError = null;
+    notifyListeners();
+    return true;
+  }
+
+  /// Добавить запасной URL (без переключения).
+  Future<void> addBackupServerUrl(String url) async {
+    if (_config == null) return;
+    final v = url.trim();
+    if (v.isEmpty) return;
+    final primary = _config!.serverUrl.trim();
+    if (v == primary || ServerConfig.normalizeServerUrl(v) == _config!.normalizedPrimaryUrl) {
+      return;
+    }
+    final backups = [..._config!.backupUrls];
+    if (!backups.contains(v)) backups.add(v);
+    _config = _config!.copyWith(backupUrls: backups);
+    await _storageService.saveServerConfig(_config!);
+    await _storageService.saveProfile(_config!);
+    notifyListeners();
+  }
+
+  /// Изменить запасной URL. Если он был активен — переключаемся на новый.
+  Future<void> updateBackupServerUrl(String oldUrl, String newUrl) async {
+    if (_config == null) return;
+    final oldV = oldUrl.trim();
+    final newV = newUrl.trim();
+    if (oldV.isEmpty || newV.isEmpty) return;
+    final backups = [..._config!.backupUrls];
+    final idx = backups.indexOf(oldV);
+    if (idx == -1) return;
+    final primaryNorm = _config!.normalizedPrimaryUrl;
+    if (ServerConfig.normalizeServerUrl(newV) == primaryNorm ||
+        backups.contains(newV)) {
+      backups.removeAt(idx);
+    } else {
+      backups[idx] = newV;
+    }
+    var updated = _config!.copyWith(backupUrls: backups);
+    if (_config!.activeUrl == oldV) {
+      if (ServerConfig.normalizeServerUrl(newV) == primaryNorm) {
+        updated = updated.copyWith(clearActiveUrl: true);
+      } else {
+        updated = updated.copyWith(activeUrl: newV);
+      }
+      _config = updated;
+      await _subsonicService.configure(_config!);
+    } else {
+      _config = updated;
+    }
+    await _storageService.saveServerConfig(_config!);
+    await _storageService.saveProfile(_config!);
+    notifyListeners();
+  }
+
+  /// Удалить запасной URL. Если он был активен — возврат на основной.
+  Future<void> removeBackupServerUrl(String url) async {
+    if (_config == null) return;
+    final v = url.trim();
+    final backups = [..._config!.backupUrls]..removeWhere((e) => e == v);
+    var updated = _config!.copyWith(backupUrls: backups);
+    final wasActive = _config!.activeUrl == v;
+    if (wasActive) {
+      updated = updated.copyWith(clearActiveUrl: true);
+    }
+    // Синхронизируем legacy localUrl.
+    if (_config!.localUrl == v) {
+      updated = updated.copyWith(clearLocalUrl: true);
+    }
+    _config = updated;
+    if (wasActive) {
+      await _subsonicService.configure(_config!);
+    }
+    await _storageService.saveServerConfig(_config!);
+    await _storageService.saveProfile(_config!);
+    notifyListeners();
+  }
+
+  /// Проверить доступность конкретного URL с текущими учётными данными.
+  Future<bool> pingServerUrl(String url) async {
+    if (_config == null) return false;
+    try {
+      final probe = SubsonicService();
+      await probe.configure(_config!.copyWith(activeUrl: url));
+      final res = await probe.pingWithError().timeout(
+            const Duration(seconds: 10),
+            onTimeout: () =>
+                PingResult(success: false, error: 'Connection timed out'),
+          );
+      return res.success;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> disconnect() async {

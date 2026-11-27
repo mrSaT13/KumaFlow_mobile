@@ -21,7 +21,8 @@ class PlayerUiSettingsService {
   static const String _keyProgressBarStyle = 'progress_bar_style';
   static const String _keyProgressBarHeight = 'progress_bar_height';
   static const String _keyProgressBarAnimation = 'progress_bar_animation';
-  static const String _keyProgressBarThumbVisible = 'progress_bar_thumb_visible';
+  static const String _keyProgressBarThumbVisible =
+      'progress_bar_thumb_visible';
   static const String _keyProgressBarThumbSize = 'progress_bar_thumb_size';
   static const String _keyProgressBarThumbColor = 'progress_bar_thumb_color';
   static const String _keyProgressBarVariant = 'progress_bar_variant';
@@ -62,7 +63,8 @@ class PlayerUiSettingsService {
   final ValueNotifier<bool> showStarRatingsNotifier = ValueNotifier(false);
   final ValueNotifier<bool> showMiniPlayerHeartNotifier = ValueNotifier(false);
   final ValueNotifier<bool> showMiniPlayerRepeatNotifier = ValueNotifier(false);
-  final ValueNotifier<bool> showMiniPlayerShuffleNotifier = ValueNotifier(false);
+  final ValueNotifier<bool> showMiniPlayerShuffleNotifier =
+      ValueNotifier(false);
   final ValueNotifier<bool> miniPlayerPcStyleNotifier = ValueNotifier(true);
   final ValueNotifier<bool> liveSearchNotifier = ValueNotifier(true);
   final ValueNotifier<double> albumArtCornerRadiusNotifier = ValueNotifier(8.0);
@@ -78,14 +80,19 @@ class PlayerUiSettingsService {
 
   // Progress bar customization notifiers
   final ValueNotifier<int> progressBarColorNotifier = ValueNotifier(0xFF4E8CA8);
-  final ValueNotifier<String> progressBarStyleNotifier = ValueNotifier('rounded');
+  final ValueNotifier<String> progressBarStyleNotifier =
+      ValueNotifier('rounded');
   final ValueNotifier<double> progressBarHeightNotifier = ValueNotifier(4.0);
   final ValueNotifier<bool> progressBarAnimationNotifier = ValueNotifier(true);
-  final ValueNotifier<bool> progressBarThumbVisibleNotifier = ValueNotifier(true);
-  final ValueNotifier<double> progressBarThumbSizeNotifier = ValueNotifier(10.0);
-  final ValueNotifier<int> progressBarThumbColorNotifier = ValueNotifier(0xFFFFFFFF);
+  final ValueNotifier<bool> progressBarThumbVisibleNotifier =
+      ValueNotifier(true);
+  final ValueNotifier<double> progressBarThumbSizeNotifier =
+      ValueNotifier(10.0);
+  final ValueNotifier<int> progressBarThumbColorNotifier =
+      ValueNotifier(0xFFFFFFFF);
   // KumaFlow (default) / Slim / Squiggly(Wavy) / Yoyo — как в Navic
-  final ValueNotifier<String> progressBarVariantNotifier = ValueNotifier('kumaflow');
+  final ValueNotifier<String> progressBarVariantNotifier =
+      ValueNotifier('kumaflow');
   final ValueNotifier<bool> homeShowMyWaveNotifier = ValueNotifier(true);
   final ValueNotifier<bool> homeShowMixesNotifier = ValueNotifier(false);
   final ValueNotifier<bool> homeShowRecentNotifier = ValueNotifier(false);
@@ -93,27 +100,37 @@ class PlayerUiSettingsService {
   final ValueNotifier<bool> homeShowYandexNotifier = ValueNotifier(false);
   final ValueNotifier<bool> homeShowGenreNotifier = ValueNotifier(false);
   final ValueNotifier<bool> homeShowAiMixNotifier = ValueNotifier(false);
-  final ValueNotifier<bool> homeShowRecentlyPlayedNotifier = ValueNotifier(false);
-  final ValueNotifier<bool> homeShowYourPlaylistsNotifier = ValueNotifier(false);
-  final ValueNotifier<bool> homeShowLatestReleasesNotifier = ValueNotifier(false);
+  final ValueNotifier<bool> homeShowRecentlyPlayedNotifier =
+      ValueNotifier(false);
+  final ValueNotifier<bool> homeShowYourPlaylistsNotifier =
+      ValueNotifier(false);
+  final ValueNotifier<bool> homeShowLatestReleasesNotifier =
+      ValueNotifier(false);
   final ValueNotifier<bool> homeShowArtistMixesNotifier = ValueNotifier(false);
   final ValueNotifier<bool> homeShowGenreMixesNotifier = ValueNotifier(false);
-  final ValueNotifier<bool> homeShowDailyPlaylistNotifier = ValueNotifier(false);
+  final ValueNotifier<bool> homeShowDailyPlaylistNotifier =
+      ValueNotifier(false);
   final ValueNotifier<bool> homeShowAiDailyNotifier = ValueNotifier(false);
-  final ValueNotifier<bool> homeShowYandexSimilarNotifier = ValueNotifier(false);
-  final ValueNotifier<bool> homeShowMyWaveShuffleNotifier = ValueNotifier(false);
-  final ValueNotifier<bool> homeMyWaveAnimatedNotifier = ValueNotifier(false);
+  final ValueNotifier<bool> homeShowYandexSimilarNotifier =
+      ValueNotifier(false);
+  final ValueNotifier<bool> homeShowMyWaveShuffleNotifier =
+      ValueNotifier(false);
+
+  /// Анимация «Моей волны» включена по умолчанию — как живой hero на ПК.
+  final ValueNotifier<bool> homeMyWaveAnimatedNotifier = ValueNotifier(true);
   final ValueNotifier<bool> homeMyWaveV2Notifier = ValueNotifier(false);
   final ValueNotifier<bool> homeMyWaveShowCountNotifier = ValueNotifier(true);
+
   /// v1 | v2 | v3 — вид фона «Моей волны» (как Hero на ПК).
-  final ValueNotifier<String> homeMyWaveVariantNotifier =
-      ValueNotifier('v2');
+  /// V3 — WebGL-шейдер под музыку, как выбрано в настройках ПК-плеера.
+  final ValueNotifier<String> homeMyWaveVariantNotifier = ValueNotifier('v3');
   // Жанровые эффекты волны (как гейты effects на ПК): поштучные тумблеры.
   // Изменение любого — инкремент версии, hero перечитывает сет.
   final ValueNotifier<int> waveFxVersionNotifier = ValueNotifier(0);
 
   static const String _kHomeMigratedV2 = 'home_migrated_v2_light';
   static const String _kHomeMigratedV3 = 'home_migrated_v3_wave_animated';
+  static const String _kHomeMigratedV4 = 'home_migrated_v4_wave_anim_on';
 
   Future<void> initialize() async {
     _prefs ??= await SharedPreferences.getInstance();
@@ -122,7 +139,21 @@ class PlayerUiSettingsService {
       final hasAnyHomePref = _kHomeAllKeys.any((k) => _prefs!.containsKey(k));
       if (hasAnyHomePref) {
         await _prefs!.setBool(_keyHomeShowMyWave, true);
-        for (final k in [_keyHomeShowMixes, _keyHomeShowRecent, _keyHomeShowPersonalized, _keyHomeShowYandex, _keyHomeShowGenre, _keyHomeShowAiMix, _keyHomeShowRecentlyPlayed, _keyHomeShowYourPlaylists, _keyHomeShowLatestReleases, _keyHomeShowArtistMixes, _keyHomeShowGenreMixes, _keyHomeShowDailyPlaylist, _keyHomeShowYandexSimilar]) {
+        for (final k in [
+          _keyHomeShowMixes,
+          _keyHomeShowRecent,
+          _keyHomeShowPersonalized,
+          _keyHomeShowYandex,
+          _keyHomeShowGenre,
+          _keyHomeShowAiMix,
+          _keyHomeShowRecentlyPlayed,
+          _keyHomeShowYourPlaylists,
+          _keyHomeShowLatestReleases,
+          _keyHomeShowArtistMixes,
+          _keyHomeShowGenreMixes,
+          _keyHomeShowDailyPlaylist,
+          _keyHomeShowYandexSimilar
+        ]) {
           await _prefs!.setBool(k, false);
         }
         await _prefs!.setBool(_keyHomeMyWaveAnimated, false);
@@ -134,6 +165,14 @@ class PlayerUiSettingsService {
         await _prefs!.setBool(_keyHomeMyWaveAnimated, false);
       }
       await _prefs!.setBool(_kHomeMigratedV3, true);
+    }
+    // 27.11.2026: включаем живую волну как на ПК (alive = true) и ставим
+    // KumaWave V3 — WebGL-шейдер под музыку, как в настройках ПК-плеера.
+    // Один раз для старых установок, где анимация была выключена миграцией.
+    if (_prefs!.getBool(_kHomeMigratedV4) != true) {
+      await _prefs!.setBool(_keyHomeMyWaveAnimated, true);
+      await _prefs!.setString(_keyHomeMyWaveVariant, 'v3');
+      await _prefs!.setBool(_kHomeMigratedV4, true);
     }
     showStarRatingsNotifier.value = getShowStarRatings();
     showMiniPlayerHeartNotifier.value = getShowMiniPlayerHeart();
@@ -179,14 +218,46 @@ class PlayerUiSettingsService {
   }
 
   static const List<String> _kHomeAllKeys = [
-    _keyHomeShowMyWave, _keyHomeShowMixes, _keyHomeShowRecent, _keyHomeShowPersonalized, _keyHomeShowYandex, _keyHomeShowGenre, _keyHomeShowAiMix,
-    _keyHomeShowRecentlyPlayed, _keyHomeShowYourPlaylists, _keyHomeShowLatestReleases, _keyHomeShowArtistMixes, _keyHomeShowGenreMixes,     _keyHomeShowDailyPlaylist, _keyHomeShowYandexSimilar, _keyHomeShowMyWaveShuffle, _keyHomeMyWaveAnimated, _keyHomeMyWaveV2, _keyHomeShowAiDaily, _keyHomeMyWaveVariant,
+    _keyHomeShowMyWave,
+    _keyHomeShowMixes,
+    _keyHomeShowRecent,
+    _keyHomeShowPersonalized,
+    _keyHomeShowYandex,
+    _keyHomeShowGenre,
+    _keyHomeShowAiMix,
+    _keyHomeShowRecentlyPlayed,
+    _keyHomeShowYourPlaylists,
+    _keyHomeShowLatestReleases,
+    _keyHomeShowArtistMixes,
+    _keyHomeShowGenreMixes,
+    _keyHomeShowDailyPlaylist,
+    _keyHomeShowYandexSimilar,
+    _keyHomeShowMyWaveShuffle,
+    _keyHomeMyWaveAnimated,
+    _keyHomeMyWaveV2,
+    _keyHomeShowAiDaily,
+    _keyHomeMyWaveVariant,
   ];
 
   Future<void> resetHomeToLightDefaults() async {
     await initialize();
     await _prefs!.setBool(_keyHomeShowMyWave, true);
-    for (final k in [_keyHomeShowMixes, _keyHomeShowRecent, _keyHomeShowPersonalized, _keyHomeShowYandex, _keyHomeShowGenre, _keyHomeShowAiMix, _keyHomeShowRecentlyPlayed, _keyHomeShowYourPlaylists, _keyHomeShowLatestReleases, _keyHomeShowArtistMixes, _keyHomeShowGenreMixes, _keyHomeShowDailyPlaylist, _keyHomeShowYandexSimilar, _keyHomeShowAiDaily]) {
+    for (final k in [
+      _keyHomeShowMixes,
+      _keyHomeShowRecent,
+      _keyHomeShowPersonalized,
+      _keyHomeShowYandex,
+      _keyHomeShowGenre,
+      _keyHomeShowAiMix,
+      _keyHomeShowRecentlyPlayed,
+      _keyHomeShowYourPlaylists,
+      _keyHomeShowLatestReleases,
+      _keyHomeShowArtistMixes,
+      _keyHomeShowGenreMixes,
+      _keyHomeShowDailyPlaylist,
+      _keyHomeShowYandexSimilar,
+      _keyHomeShowAiDaily
+    ]) {
       await _prefs!.setBool(k, false);
     }
     // Notifiers
@@ -373,7 +444,8 @@ class PlayerUiSettingsService {
     progressBarThumbVisibleNotifier.value = v;
   }
 
-  bool getProgressBarThumbVisible() => _prefs?.getBool(_keyProgressBarThumbVisible) ?? true;
+  bool getProgressBarThumbVisible() =>
+      _prefs?.getBool(_keyProgressBarThumbVisible) ?? true;
 
   Future<void> setProgressBarThumbSize(double s) async {
     await initialize();
@@ -381,7 +453,8 @@ class PlayerUiSettingsService {
     progressBarThumbSizeNotifier.value = s;
   }
 
-  double getProgressBarThumbSize() => _prefs?.getDouble(_keyProgressBarThumbSize) ?? 10.0;
+  double getProgressBarThumbSize() =>
+      _prefs?.getDouble(_keyProgressBarThumbSize) ?? 10.0;
 
   Future<void> setProgressBarThumbColor(int c) async {
     await initialize();
@@ -389,7 +462,8 @@ class PlayerUiSettingsService {
     progressBarThumbColorNotifier.value = c;
   }
 
-  int getProgressBarThumbColor() => _prefs?.getInt(_keyProgressBarThumbColor) ?? 0xFFFFFFFF;
+  int getProgressBarThumbColor() =>
+      _prefs?.getInt(_keyProgressBarThumbColor) ?? 0xFFFFFFFF;
 
   Future<void> setProgressBarVariant(String v) async {
     await initialize();
@@ -397,53 +471,162 @@ class PlayerUiSettingsService {
     progressBarVariantNotifier.value = v;
   }
 
-  String getProgressBarVariant() => _prefs?.getString(_keyProgressBarVariant) ?? 'kumaflow';
+  String getProgressBarVariant() =>
+      _prefs?.getString(_keyProgressBarVariant) ?? 'kumaflow';
 
-  Future<void> setHomeShowMyWave(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeShowMyWave, v); homeShowMyWaveNotifier.value = v; }
+  Future<void> setHomeShowMyWave(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeShowMyWave, v);
+    homeShowMyWaveNotifier.value = v;
+  }
+
   bool getHomeShowMyWave() => _prefs?.getBool(_keyHomeShowMyWave) ?? true;
-  Future<void> setHomeShowMixes(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeShowMixes, v); homeShowMixesNotifier.value = v; }
+  Future<void> setHomeShowMixes(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeShowMixes, v);
+    homeShowMixesNotifier.value = v;
+  }
+
   bool getHomeShowMixes() => _prefs?.getBool(_keyHomeShowMixes) ?? false;
-  Future<void> setHomeShowRecent(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeShowRecent, v); homeShowRecentNotifier.value = v; }
+  Future<void> setHomeShowRecent(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeShowRecent, v);
+    homeShowRecentNotifier.value = v;
+  }
+
   bool getHomeShowRecent() => _prefs?.getBool(_keyHomeShowRecent) ?? false;
-  Future<void> setHomeShowPersonalized(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeShowPersonalized, v); homeShowPersonalizedNotifier.value = v; }
-  bool getHomeShowPersonalized() => _prefs?.getBool(_keyHomeShowPersonalized) ?? false;
-  Future<void> setHomeShowYandex(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeShowYandex, v); homeShowYandexNotifier.value = v; }
+  Future<void> setHomeShowPersonalized(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeShowPersonalized, v);
+    homeShowPersonalizedNotifier.value = v;
+  }
+
+  bool getHomeShowPersonalized() =>
+      _prefs?.getBool(_keyHomeShowPersonalized) ?? false;
+  Future<void> setHomeShowYandex(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeShowYandex, v);
+    homeShowYandexNotifier.value = v;
+  }
+
   bool getHomeShowYandex() => _prefs?.getBool(_keyHomeShowYandex) ?? false;
-  Future<void> setHomeShowGenre(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeShowGenre, v); homeShowGenreNotifier.value = v; }
+  Future<void> setHomeShowGenre(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeShowGenre, v);
+    homeShowGenreNotifier.value = v;
+  }
+
   bool getHomeShowGenre() => _prefs?.getBool(_keyHomeShowGenre) ?? false;
-  Future<void> setHomeShowAiMix(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeShowAiMix, v); homeShowAiMixNotifier.value = v; }
+  Future<void> setHomeShowAiMix(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeShowAiMix, v);
+    homeShowAiMixNotifier.value = v;
+  }
+
   bool getHomeShowAiMix() => _prefs?.getBool(_keyHomeShowAiMix) ?? false;
-  Future<void> setHomeShowRecentlyPlayed(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeShowRecentlyPlayed, v); homeShowRecentlyPlayedNotifier.value = v; }
-  bool getHomeShowRecentlyPlayed() => _prefs?.getBool(_keyHomeShowRecentlyPlayed) ?? false;
-  Future<void> setHomeShowYourPlaylists(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeShowYourPlaylists, v); homeShowYourPlaylistsNotifier.value = v; }
-  bool getHomeShowYourPlaylists() => _prefs?.getBool(_keyHomeShowYourPlaylists) ?? false;
-  Future<void> setHomeShowLatestReleases(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeShowLatestReleases, v); homeShowLatestReleasesNotifier.value = v; }
-  bool getHomeShowLatestReleases() => _prefs?.getBool(_keyHomeShowLatestReleases) ?? false;
-  Future<void> setHomeShowArtistMixes(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeShowArtistMixes, v); homeShowArtistMixesNotifier.value = v; }
-  bool getHomeShowArtistMixes() => _prefs?.getBool(_keyHomeShowArtistMixes) ?? false;
-  Future<void> setHomeShowGenreMixes(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeShowGenreMixes, v); homeShowGenreMixesNotifier.value = v; }
-  bool getHomeShowGenreMixes() => _prefs?.getBool(_keyHomeShowGenreMixes) ?? false;
-  Future<void> setHomeShowDailyPlaylist(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeShowDailyPlaylist, v); homeShowDailyPlaylistNotifier.value = v; }
-  bool getHomeShowDailyPlaylist() => _prefs?.getBool(_keyHomeShowDailyPlaylist) ?? false;
-  Future<void> setHomeShowAiDaily(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeShowAiDaily, v); homeShowAiDailyNotifier.value = v; }
+  Future<void> setHomeShowRecentlyPlayed(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeShowRecentlyPlayed, v);
+    homeShowRecentlyPlayedNotifier.value = v;
+  }
+
+  bool getHomeShowRecentlyPlayed() =>
+      _prefs?.getBool(_keyHomeShowRecentlyPlayed) ?? false;
+  Future<void> setHomeShowYourPlaylists(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeShowYourPlaylists, v);
+    homeShowYourPlaylistsNotifier.value = v;
+  }
+
+  bool getHomeShowYourPlaylists() =>
+      _prefs?.getBool(_keyHomeShowYourPlaylists) ?? false;
+  Future<void> setHomeShowLatestReleases(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeShowLatestReleases, v);
+    homeShowLatestReleasesNotifier.value = v;
+  }
+
+  bool getHomeShowLatestReleases() =>
+      _prefs?.getBool(_keyHomeShowLatestReleases) ?? false;
+  Future<void> setHomeShowArtistMixes(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeShowArtistMixes, v);
+    homeShowArtistMixesNotifier.value = v;
+  }
+
+  bool getHomeShowArtistMixes() =>
+      _prefs?.getBool(_keyHomeShowArtistMixes) ?? false;
+  Future<void> setHomeShowGenreMixes(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeShowGenreMixes, v);
+    homeShowGenreMixesNotifier.value = v;
+  }
+
+  bool getHomeShowGenreMixes() =>
+      _prefs?.getBool(_keyHomeShowGenreMixes) ?? false;
+  Future<void> setHomeShowDailyPlaylist(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeShowDailyPlaylist, v);
+    homeShowDailyPlaylistNotifier.value = v;
+  }
+
+  bool getHomeShowDailyPlaylist() =>
+      _prefs?.getBool(_keyHomeShowDailyPlaylist) ?? false;
+  Future<void> setHomeShowAiDaily(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeShowAiDaily, v);
+    homeShowAiDailyNotifier.value = v;
+  }
+
   bool getHomeShowAiDaily() => _prefs?.getBool(_keyHomeShowAiDaily) ?? false;
-  Future<void> setHomeShowYandexSimilar(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeShowYandexSimilar, v); homeShowYandexSimilarNotifier.value = v; }
-  bool getHomeShowYandexSimilar() => _prefs?.getBool(_keyHomeShowYandexSimilar) ?? false;
-  Future<void> setHomeShowMyWaveShuffle(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeShowMyWaveShuffle, v); homeShowMyWaveShuffleNotifier.value = v; }
-  bool getHomeShowMyWaveShuffle() => _prefs?.getBool(_keyHomeShowMyWaveShuffle) ?? false;
-  Future<void> setHomeMyWaveAnimated(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeMyWaveAnimated, v); homeMyWaveAnimatedNotifier.value = v; }
-  bool getHomeMyWaveAnimated() => _prefs?.getBool(_keyHomeMyWaveAnimated) ?? false;
-  Future<void> setHomeMyWaveV2(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeMyWaveV2, v); homeMyWaveV2Notifier.value = v; }
+  Future<void> setHomeShowYandexSimilar(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeShowYandexSimilar, v);
+    homeShowYandexSimilarNotifier.value = v;
+  }
+
+  bool getHomeShowYandexSimilar() =>
+      _prefs?.getBool(_keyHomeShowYandexSimilar) ?? false;
+  Future<void> setHomeShowMyWaveShuffle(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeShowMyWaveShuffle, v);
+    homeShowMyWaveShuffleNotifier.value = v;
+  }
+
+  bool getHomeShowMyWaveShuffle() =>
+      _prefs?.getBool(_keyHomeShowMyWaveShuffle) ?? false;
+  Future<void> setHomeMyWaveAnimated(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeMyWaveAnimated, v);
+    homeMyWaveAnimatedNotifier.value = v;
+  }
+
+  bool getHomeMyWaveAnimated() =>
+      _prefs?.getBool(_keyHomeMyWaveAnimated) ?? true;
+  Future<void> setHomeMyWaveV2(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeMyWaveV2, v);
+    homeMyWaveV2Notifier.value = v;
+  }
+
   bool getHomeMyWaveV2() => _prefs?.getBool(_keyHomeMyWaveV2) ?? false;
-  Future<void> setHomeMyWaveShowCount(bool v) async { await initialize(); await _prefs!.setBool(_keyHomeMyWaveShowCount, v); homeMyWaveShowCountNotifier.value = v; }
-  bool getHomeMyWaveShowCount() => _prefs?.getBool(_keyHomeMyWaveShowCount) ?? true;
+  Future<void> setHomeMyWaveShowCount(bool v) async {
+    await initialize();
+    await _prefs!.setBool(_keyHomeMyWaveShowCount, v);
+    homeMyWaveShowCountNotifier.value = v;
+  }
+
+  bool getHomeMyWaveShowCount() =>
+      _prefs?.getBool(_keyHomeMyWaveShowCount) ?? true;
   Future<void> setHomeMyWaveVariant(String v) async {
     final safe = (v == 'v1' || v == 'v3') ? v : 'v2';
     await initialize();
     await _prefs!.setString(_keyHomeMyWaveVariant, safe);
     homeMyWaveVariantNotifier.value = safe;
   }
-  String getHomeMyWaveVariant() => _prefs?.getString(_keyHomeMyWaveVariant) ?? 'v2';
+
+  String getHomeMyWaveVariant() =>
+      _prefs?.getString(_keyHomeMyWaveVariant) ?? 'v3';
 
   static const String _keyWaveFxPrefix = 'wave_fx_';
   bool getWaveFx(WaveMood m) =>

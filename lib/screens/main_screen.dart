@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
@@ -17,6 +18,7 @@ import '../theme/app_theme.dart';
 import '../utils/navigation_helper.dart';
 import '../widgets/widgets.dart';
 import '../widgets/app_gradient_background.dart';
+import '../widgets/compact_status_notice.dart';
 import '../l10n/app_localizations.dart';
 import 'home_screen.dart';
 import 'library_screen.dart';
@@ -52,7 +54,10 @@ class _MainScreenState extends State<MainScreen> {
   int _searchTapCount = 0;
   DateTime _lastSearchTap = DateTime.fromMillisecondsSinceEpoch(0);
   bool _showRightSidebar = true;
-  final Set<String> _remoteBannerDismissed = {};
+  // Всплывающий тост «найден пульт» — сам исчезает через несколько секунд.
+  String? _remoteToastLabel;
+  Timer? _remoteToastTimer;
+  final Set<String> _remoteToastShown = {};
 
   List<Widget> get _screens {
     final base = <Widget>[
@@ -69,7 +74,8 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   int get _settingsIndex => _screens.length - 1;
-  int get _absIndex => AudiobookshelfService().enabled ? _screens.length - 2 : -1;
+  int get _absIndex =>
+      AudiobookshelfService().enabled ? _screens.length - 2 : -1;
 
   void _onAbsToggled() {
     if (!mounted) return;
@@ -93,94 +99,125 @@ class _MainScreenState extends State<MainScreen> {
     } catch (_) {}
   }
 
-  /// Пилюля «Найден KumaFlow в сети» — тап ведёт на страницу пульта.
-  /// Новое несохранённое + сохранённое-в-сети (проба прошла, свежее 10 мин).
-  Widget _buildRemoteFoundBanner() {
+  /// Проверить соединение (бывшая кнопка на офлайн-баннере).
+  Future<void> _retryConnection() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final lib = Provider.of<LibraryProvider>(context, listen: false);
     try {
-      final discovery = context.watch<RemoteDiscovery>();
-      final savedIds = discovery.saved.map((e) => e.id).toSet();
-      final savedHosts = discovery.saved.map((e) => e.host).toSet();
-      final freshNew = discovery.found.where((d) {
-        if (savedIds.contains(d.id)) return false;
-        if (_remoteBannerDismissed.contains(d.id)) return false;
-        return DateTime.now().difference(d.lastSeen) <
-            const Duration(minutes: 10);
-      }).toList();
-      final freshSaved = discovery.found.where((d) {
-        if (_remoteBannerDismissed.contains('saved:${d.host}')) return false;
-        final known = savedIds.contains(d.id) || savedHosts.contains(d.host);
-        if (!known) return false;
-        return DateTime.now().difference(d.lastSeen) <
-            const Duration(minutes: 10);
-      }).toList();
-      RemoteDevice? d;
-      String? label;
-      String? dismissKey;
-      if (freshNew.isNotEmpty) {
-        d = freshNew.first;
-        label = 'Найден KumaFlow: ${d.name} — управлять?';
-        dismissKey = d.id;
-      } else if (freshSaved.isNotEmpty) {
-        d = freshSaved.first;
-        label = 'Пульт в сети: ${d.name} — открыть управление?';
-        dismissKey = 'saved:${d.host}';
-      }
-      if (d == null) return const SizedBox.shrink();
-      final dd = d;
-      final dk = dismissKey!;
-      return Container(
-        width: double.infinity,
-        color: const Color(0xFF4E8CA8),
-        child: SafeArea(
-          bottom: false,
-          child: Padding(
-            padding:
-                const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-            child: Row(
-              children: [
-                const Icon(CupertinoIcons.desktopcomputer,
-                    color: Colors.white, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    label!,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const RemoteControlScreen()),
-                    );
-                  },
-                  child: const Text('Пульт',
-                      style: TextStyle(color: Colors.white)),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded,
-                      color: Colors.white70, size: 18),
-                  onPressed: () => setState(
-                      () => _remoteBannerDismissed.add(dk)),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    } catch (_) {
+      await auth.retryConnection();
+    } catch (_) {}
+    try {
+      lib.setServerOfflineMode(OfflineService().isOfflineMode);
+      await lib.refreshOnline();
+    } catch (_) {}
+  }
+
+  /// Показать тост «найден пульт» — сам исчезнет через 5 секунд.
+  void _showRemoteToast(String label, String key) {
+    if (_remoteToastShown.contains(key)) return;
+    _remoteToastShown.add(key);
+    if (!mounted) return;
+    setState(() => _remoteToastLabel = label);
+    _remoteToastTimer?.cancel();
+    _remoteToastTimer = Timer(const Duration(seconds: 5), () {
+      if (!mounted) return;
+      setState(() => _remoteToastLabel = null);
+    });
+  }
+
+  /// Уведомления сверху: исчезающий тост пульта + офлайн-пилюля справа.
+  Widget _buildStatusNotices(bool isLocalMode) {
+    // Пустой SafeArea добавлял бы второй status-bar padding к шапке главной,
+    // из-за чего приветствие висело слишком низко.
+    if (_remoteToastLabel == null && !widget.isOfflineMode && !isLocalMode) {
       return const SizedBox.shrink();
     }
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 2),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            _buildRemoteToast(),
+            if (widget.isOfflineMode || isLocalMode) ...[
+              const SizedBox(height: 4),
+              CompactStatusNotice(
+                icon: isLocalMode
+                    ? CupertinoIcons.folder_fill
+                    : CupertinoIcons.wifi_slash,
+                color: isLocalMode ? Colors.indigo : Colors.orange,
+                label: isLocalMode
+                    ? AppLocalizations.of(context)!.localFilesModeBanner
+                    : AppLocalizations.of(context)!.offlineModeBanner,
+                actionLabel: isLocalMode ? null : 'Проверить',
+                onAction: isLocalMode ? null : _retryConnection,
+                autoCollapseOnce: true,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRemoteToast() {
+    final label = _remoteToastLabel;
+    return AnimatedOpacity(
+      opacity: label == null ? 0 : 1,
+      duration: const Duration(milliseconds: 220),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOut,
+        alignment: Alignment.topRight,
+        child: label == null
+            ? const SizedBox(width: 0, height: 0)
+            : GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const RemoteControlScreen()),
+                  );
+                },
+                child: Container(
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4E8CA8),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.18),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(CupertinoIcons.desktopcomputer,
+                          color: Colors.white, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        label,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+      ),
+    );
   }
 
   @override
   void dispose() {
+    _remoteToastTimer?.cancel();
     AudiobookshelfService().enabledNotifier.removeListener(_onAbsToggled);
     try {
       OfflineService().removeListener(_onOfflineChanged);
@@ -200,13 +237,14 @@ class _MainScreenState extends State<MainScreen> {
     // Системное уведомление о найденном ПК (in-app пилюля — сама по себе).
     // onSavedOnline — только уведомления про сохранённый в сети, коннект не трогаем.
     try {
-      final discovery =
-          Provider.of<RemoteDiscovery>(context, listen: false);
+      final discovery = Provider.of<RemoteDiscovery>(context, listen: false);
       discovery.onFound = (d) {
         RemoteFoundNotify.instance.showFound(d);
+        _showRemoteToast('Найден KumaFlow: ${d.name}', d.id);
       };
       discovery.onSavedOnline = (d) {
         RemoteFoundNotify.instance.showFound(d);
+        _showRemoteToast('Пульт в сети: ${d.name}', 'saved:${d.host}');
       };
       discovery.autoDiscoverOnce();
     } catch (_) {}
@@ -215,6 +253,23 @@ class _MainScreenState extends State<MainScreen> {
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Если ПК уже был найден до открытия экрана — показываем тост один раз.
+      try {
+        final discovery = Provider.of<RemoteDiscovery>(context, listen: false);
+        for (final d in discovery.found) {
+          if (DateTime.now().difference(d.lastSeen) >
+              const Duration(minutes: 10)) {
+            continue;
+          }
+          final saved =
+              discovery.saved.any((s) => s.id == d.id || s.host == d.host);
+          if (saved) {
+            _showRemoteToast('Пульт в сети: ${d.name}', 'saved:${d.host}');
+          } else {
+            _showRemoteToast('Найден KumaFlow: ${d.name}', d.id);
+          }
+        }
+      } catch (_) {}
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final libraryProvider = Provider.of<LibraryProvider>(
         context,
@@ -251,7 +306,8 @@ class _MainScreenState extends State<MainScreen> {
       playerProvider.setLocalMusicService(localMusicService);
 
       if (authProvider.isLocalOnlyMode) {
-        libraryProvider.setLocalMusicService(localMusicService, mergeWithServer: false);
+        libraryProvider.setLocalMusicService(localMusicService,
+            mergeWithServer: false);
         libraryProvider.setLocalOnlyMode(true);
 
         if (localMusicService.isEmpty && !localMusicService.isScanning) {
@@ -265,7 +321,8 @@ class _MainScreenState extends State<MainScreen> {
         // Respect saved merge preference — don't force-enable on every restart
         final prefs = await SharedPreferences.getInstance();
         final savedMerge = prefs.getBool('merge_local_library') ?? false;
-        libraryProvider.setLocalMusicService(localMusicService, mergeWithServer: savedMerge);
+        libraryProvider.setLocalMusicService(localMusicService,
+            mergeWithServer: savedMerge);
         libraryProvider.initialize();
       }
 
@@ -279,8 +336,9 @@ class _MainScreenState extends State<MainScreen> {
         try {
           final lib = Provider.of<LibraryProvider>(context, listen: false);
           // wait until library has songs
-          for (int i=0; i<10; i++) {
-            if (lib.cachedAllSongs.isNotEmpty || lib.randomSongs.isNotEmpty) break;
+          for (int i = 0; i < 10; i++) {
+            if (lib.cachedAllSongs.isNotEmpty || lib.randomSongs.isNotEmpty)
+              break;
             await Future.delayed(const Duration(seconds: 1));
           }
           final pool = await lib.getPoolForMix(limit: 700);
@@ -293,10 +351,15 @@ class _MainScreenState extends State<MainScreen> {
               final sub = Provider.of<SubsonicService>(context, listen: false);
               await aiMix.createServerPlaylist(subsonic: sub, result: res);
               await lib.loadPlaylists();
-              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ежедневный ИИ-микс "${res.name}" создан'), duration: const Duration(seconds: 3)));
+              if (mounted)
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('Ежедневный ИИ-микс "${res.name}" создан'),
+                    duration: const Duration(seconds: 3)));
             } catch (_) {}
           }
-        } catch (e) { debugPrint('[DailyAI] error: $e'); }
+        } catch (e) {
+          debugPrint('[DailyAI] error: $e');
+        }
       });
     });
   }
@@ -595,19 +658,19 @@ class _MainScreenState extends State<MainScreen> {
                         },
                       ),
                     ),
-                  if (_showRightSidebar)
-                    Selector<PlayerProvider, bool>(
-                      selector: (_, p) =>
-                          p.currentSong != null || p.isPlayingRadio,
-                      builder: (context, hasCurrentSong, _) {
-                        return hasCurrentSong
-                            ? const RightSidebar()
-                            : const SizedBox.shrink();
-                      },
-                    ),
-                ],
+                    if (_showRightSidebar)
+                      Selector<PlayerProvider, bool>(
+                        selector: (_, p) =>
+                            p.currentSong != null || p.isPlayingRadio,
+                        builder: (context, hasCurrentSong, _) {
+                          return hasCurrentSong
+                              ? const RightSidebar()
+                              : const SizedBox.shrink();
+                        },
+                      ),
+                  ],
+                ),
               ),
-            ),
               Selector<PlayerProvider, bool>(
                 selector: (_, p) => p.currentSong != null || p.isPlayingRadio,
                 builder: (context, hasCurrentSong, _) {
@@ -639,137 +702,71 @@ class _MainScreenState extends State<MainScreen> {
               backgroundColor: Colors.transparent,
               resizeToAvoidBottomInset: false,
               body: Column(
-              children: [
-                if (widget.isOfflineMode || isLocalMode)                  Container(
-                    width: double.infinity,
-                    color: isLocalMode ? Colors.indigo : Colors.orange,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 8,
-                      horizontal: 16,
-                    ),
-                    child: SafeArea(
-                      bottom: false,
-                      child: Row(
-                        children: [
-                          Icon(
-                            isLocalMode
-                                ? CupertinoIcons.folder_fill
-                                : CupertinoIcons.wifi_slash,
-                            color: Colors.white,
-                            size: 18,
+                children: [
+                  _buildStatusNotices(isLocalMode),
+                  if (isLocalMode)
+                    Selector<LocalMusicService, (bool, double, String)>(
+                      selector: (_, s) =>
+                          (s.isScanning, s.scanProgress, s.scanStatus),
+                      builder: (context, data, _) {
+                        final (isScanning, progress, status) = data;
+                        if (!isScanning) return const SizedBox.shrink();
+                        return Container(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primaryContainer
+                              .withValues(alpha: 0.85),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              isLocalMode
-                                  ? AppLocalizations.of(
-                                      context,
-                                    )!
-                                      .localFilesModeBanner
-                                  : AppLocalizations.of(
-                                      context,
-                                    )!
-                                      .offlineModeBanner,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          if (!isLocalMode)
-                            IconButton(
-                              icon: const Icon(
-                                CupertinoIcons.refresh,
-                                color: Colors.white,
-                                size: 18,
-                              ),
-                              tooltip: 'Проверить соединение',
-                              onPressed: () async {
-                                try {
-                                  final auth = Provider.of<AuthProvider>(
-                                      context,
-                                      listen: false);
-                                  await auth.retryConnection();
-                                } catch (_) {}
-                                try {
-                                  final lib = Provider.of<LibraryProvider>(
-                                      context,
-                                      listen: false);
-                                  lib.setServerOfflineMode(
-                                      OfflineService().isOfflineMode);
-                                  await lib.refreshOnline();
-                                } catch (_) {}
-                              },
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                _buildRemoteFoundBanner(),
-                if (isLocalMode)
-                  Selector<LocalMusicService, (bool, double, String)>(
-                    selector: (_, s) =>
-                        (s.isScanning, s.scanProgress, s.scanStatus),
-                    builder: (context, data, _) {
-                      final (isScanning, progress, status) = data;
-                      if (!isScanning) return const SizedBox.shrink();
-                      return Container(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primaryContainer
-                            .withValues(alpha: 0.85),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        child: Row(
-                          children: [
-                            const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                status,
-                                style: const TextStyle(
+                          child: Row(
+                            children: [
+                              const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                   color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
-                            ),
-                            if (progress > 0)
-                              Text(
-                                '${(progress * 100).toStringAsFixed(0)}%',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  status,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
-                          ],
-                        ),
-                      );
-                    },
+                              if (progress > 0)
+                                Text(
+                                  '${(progress * 100).toStringAsFixed(0)}%',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  Expanded(
+                    child: Navigator(
+                      key: NavigationHelper.mobileNavigatorKey,
+                      onGenerateRoute: (settings) {
+                        return MaterialPageRoute(
+                          builder: (_) => IndexedStack(
+                            index: _currentIndex,
+                            children: _screens,
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                Expanded(
-                  child: Navigator(
-                    key: NavigationHelper.mobileNavigatorKey,
-                    onGenerateRoute: (settings) {
-                      return MaterialPageRoute(
-                        builder: (_) => IndexedStack(
-                          index: _currentIndex,
-                          children: _screens,
-                        ),
-                      );
-                    },
-                  ),
-                ),
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [

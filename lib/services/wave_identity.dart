@@ -166,17 +166,19 @@ double waveOverlap(List<String> ids, WaveContext? ctx) {
   if (isRadio && (radioName ?? '').trim().isNotEmpty) {
     return (kicker: 'Сейчас играет · Радио', title: radioName!.trim());
   }
+  final name = (queueName ?? '').trim();
+  if (name.toLowerCase().startsWith('микс по треку')) {
+    return (kicker: 'Сейчас играет · Микс', title: name);
+  }
   if (isWavePlaylistName(queueName)) {
-    final name = queueName!.trim();
-    // Сид («В стиле: X» / «По треку: …») — показываем его же.
+    // Сид («В стиле: X» / «По треку: …») — подпись волны меняется
+    // динамически в зависимости от того, как она запущена.
     final lower = name.toLowerCase();
-    if (lower.startsWith('в стиле') || lower.startsWith('по треку')) {
-      return (kicker: 'Сейчас играет', title: name);
-    }
+    final isSeed = lower.startsWith('в стиле') || lower.startsWith('по треку');
     final hint = (queueHint ?? '').trim();
     return (
       kicker: 'Сейчас играет · Моя волна',
-      title: hint.isNotEmpty ? hint : 'Моя волна',
+      title: hint.isNotEmpty ? hint : (isSeed ? name : 'Моя волна'),
     );
   }
   if ((queueName ?? '').trim().isNotEmpty) {

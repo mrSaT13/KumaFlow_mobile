@@ -118,6 +118,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _username;
   final ScrollController _scrollController = ScrollController();
   bool _showScrollToTop = false;
+  // Быстрые действия (микрофон/история/пульт) по умолчанию свёрнуты.
+  bool _showQuickActions = false;
   DateTime _lastEnrichAt = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
@@ -174,8 +176,11 @@ class _HomeScreenState extends State<HomeScreen> {
     showModalBottomSheet(
       context: ctx,
       isScrollControlled: true,
-      backgroundColor: Theme.of(ctx).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor: Theme.of(ctx).brightness == Brightness.dark
+          ? const Color(0xFF1E1E1E)
+          : Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       // Шторка больше не уезжает под статус-бар и гасится свайпом вниз:
       // DraggableScrollableSheet отдаёт скролл контенту, а свайп от верха —
       // закрытию. Плюс явный крестик (назад — не единственный выход).
@@ -196,7 +201,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _dailyKeyFor(List<Song> pool, String bannedKey) {
-    final date = DateTime.now().toIso8601String().substring(0, 10); // YYYY-MM-DD
+    final date =
+        DateTime.now().toIso8601String().substring(0, 10); // YYYY-MM-DD
     return 'daily:$date:$bannedKey:${pool.length}';
   }
 
@@ -210,7 +216,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (res != null && mounted) {
         // Триггерим перестройку FutureBuilder'ов на экране ИИ-миксов при
         // следующем открытии; здесь setState не нужен.
-        debugPrint('[Home] daily AI mix ready: ${res.name} • ${res.songs.length}');
+        debugPrint(
+            '[Home] daily AI mix ready: ${res.name} • ${res.songs.length}');
       }
     }).catchError((e) {
       debugPrint('[Home] daily AI mix failed: $e');
@@ -241,12 +248,18 @@ class _HomeScreenState extends State<HomeScreen> {
       final fresh = rec.getPersonalizedFeed(pool, limit: 20);
       MixCacheService().saveDailyMix(key, fresh);
       if (mounted && _dailyCacheKey == requestKey) {
-        setState(() { _cachedDaily = fresh; _dailyLoading = false; });
+        setState(() {
+          _cachedDaily = fresh;
+          _dailyLoading = false;
+        });
       }
     }).catchError((_) {
       if (mounted && _dailyCacheKey == requestKey) {
         final fresh = rec.getPersonalizedFeed(pool, limit: 20);
-        setState(() { _cachedDaily = fresh; _dailyLoading = false; });
+        setState(() {
+          _cachedDaily = fresh;
+          _dailyLoading = false;
+        });
       }
     });
   }
@@ -255,7 +268,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final off = OfflineService();
     if (off.isOfflineMode) {
       // Офлайн — возвращаем скачанные книги как continue listening
-      _booksFuture = off.getDownloadedBooks().catchError((_) => <Map<String, dynamic>>[]);
+      _booksFuture =
+          off.getDownloadedBooks().catchError((_) => <Map<String, dynamic>>[]);
       return _booksFuture!;
     }
     final now = DateTime.now();
@@ -263,7 +277,9 @@ class _HomeScreenState extends State<HomeScreen> {
       return _booksFuture!;
     }
     _booksFetchedAt = now;
-    _booksFuture = AudiobookshelfService().fetchContinueListeningWithFallback().catchError((_) => <Map<String, dynamic>>[]);
+    _booksFuture = AudiobookshelfService()
+        .fetchContinueListeningWithFallback()
+        .catchError((_) => <Map<String, dynamic>>[]);
     return _booksFuture!;
   }
 
@@ -279,7 +295,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final configName = authProvider.config?.username;
-      if (configName != null && configName.isNotEmpty && configName != 'local') {
+      if (configName != null &&
+          configName.isNotEmpty &&
+          configName != 'local') {
         setState(() => _username = configName);
         // Save for next time
         await storage.saveUsername(configName);
@@ -316,8 +334,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final hPad = isDesktop ? 32.0 : 16.0;
 
     // Get accent color from theme settings (listen: true to rebuild on change)
-    final accentColor = context.select<ThemeService, Color>((t) => t.accentColor.color);
-    final intensity = context.select<ThemeService, double>((t) => t.gradientIntensity);
+    final accentColor =
+        context.select<ThemeService, Color>((t) => t.accentColor.color);
+    final intensity =
+        context.select<ThemeService, double>((t) => t.gradientIntensity);
 
     return Stack(
       children: [
@@ -352,1151 +372,1513 @@ class _HomeScreenState extends State<HomeScreen> {
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
-              SliverToBoxAdapter(child: SyncProgressBanner()),
-              SliverAppBar(
-                pinned: true,
-                floating: true,
-                expandedHeight: isDesktop ? 64 : 56,
-                collapsedHeight: isDesktop ? 64 : 56,
-                backgroundColor: isDark
-                    ? const Color(0xFF121212).withValues(alpha: 0.72)
-                    : Colors.white.withValues(alpha: 0.82),
-                surfaceTintColor: Colors.transparent,
-                elevation: 0,
-                scrolledUnderElevation: 8,
-                shadowColor: Colors.black.withValues(alpha: 0.35),
-                flexibleSpace: ClipRect(
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            accentColor.withValues(alpha: (isDark ? 0.40 : 0.20) * intensity),
-                            accentColor.withValues(alpha: (isDark ? 0.16 : 0.08) * intensity),
-                            (isDark ? Colors.black : Colors.white)
-                                .withValues(alpha: 0.0),
-                          ],
-                          stops: const [0.0, 0.55, 1.0],
-                        ),
-                        border: Border(
-                          bottom: BorderSide(
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.08)
-                                : Colors.black.withValues(alpha: 0.07),
-                            width: 1,
-                          ),
-                        ),
-                      ),
-                      child: FlexibleSpaceBar(
-                        titlePadding: EdgeInsets.only(left: hPad, bottom: 14, right: 56),
-                        title: Text(
-                          _getGreeting(),
-                          style: TextStyle(
-                            fontSize: isDesktop ? 22 : 18,
-                            fontWeight: FontWeight.w800,
-                            color: isDark ? Colors.white : Colors.black,
-                            letterSpacing: -0.3,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black.withValues(alpha: isDark ? 0.65 : 0.22),
-                                blurRadius: 12,
-                                offset: const Offset(0, 1),
-                              ),
-                              if (isDark)
-                                Shadow(
-                                  color: Colors.black.withValues(alpha: 0.9),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 0),
-                                ),
+                SliverToBoxAdapter(child: SyncProgressBanner()),
+                SliverAppBar(
+                  pinned: true,
+                  floating: true,
+                  expandedHeight: isDesktop ? 64 : 44,
+                  collapsedHeight: isDesktop ? 64 : 44,
+                  backgroundColor: isDark
+                      ? const Color(0xFF121212).withValues(alpha: 0.72)
+                      : Colors.white.withValues(alpha: 0.82),
+                  surfaceTintColor: Colors.transparent,
+                  elevation: 0,
+                  scrolledUnderElevation: 8,
+                  shadowColor: Colors.black.withValues(alpha: 0.35),
+                  flexibleSpace: ClipRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              accentColor.withValues(
+                                  alpha: (isDark ? 0.40 : 0.20) * intensity),
+                              accentColor.withValues(
+                                  alpha: (isDark ? 0.16 : 0.08) * intensity),
+                              (isDark ? Colors.black : Colors.white)
+                                  .withValues(alpha: 0.0),
                             ],
+                            stops: const [0.0, 0.55, 1.0],
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          border: Border(
+                            bottom: BorderSide(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.08)
+                                  : Colors.black.withValues(alpha: 0.07),
+                              width: 1,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                ),
-                actions: [
-                  // Sonar: кнопка микрофона → редирект на страницу узнавания.
-                  IconButton(
-                    icon: Icon(
-                      CupertinoIcons.mic_fill,
-                      color: isDark ? Colors.white : Colors.black,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.15),
-                          blurRadius: 8,
-                        ),
-                      ],
-                    ),
-                    onPressed: () {
-                      NavigationHelper.push(context, const SonarScreen());
-                    },
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      CupertinoIcons.clock,
-                      color: isDark ? Colors.white : Colors.black,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.15),
-                          blurRadius: 8,
-                        ),
-                      ],
-                    ),
-                    onPressed: () {
-                      NavigationHelper.push(context, const HistoryScreen());
-                    },
-                  ),
-                  // Пульт: точка — найден/сохранён ПК рядом, акцент — подключено.
-                  // Тап сразу открывает страницу управления.
-                  Consumer2<RemoteDiscovery, RemoteClient>(
-                    builder: (context, discovery, client, _) {
-                      final connected = client.isConnected;
-                      final hasDevices = discovery.found.isNotEmpty ||
-                          discovery.saved.isNotEmpty;
-                      final base =
-                          isDark ? Colors.white : Colors.black;
-                      final iconColor = connected
-                          ? const Color(0xFF4E8CA8)
-                          : base;
-                      return Stack(
-                        alignment: Alignment.topRight,
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              connected
-                                  ? CupertinoIcons.desktopcomputer
-                                  : CupertinoIcons.tv,
-                              color: iconColor,
+                        child: FlexibleSpaceBar(
+                          titlePadding:
+                              EdgeInsets.only(left: hPad, bottom: 8, right: 56),
+                          title: Text(
+                            _getGreeting(),
+                            style: TextStyle(
+                              fontSize: isDesktop ? 22 : 18,
+                              fontWeight: FontWeight.w800,
+                              color: isDark ? Colors.white : Colors.black,
+                              letterSpacing: -0.3,
                               shadows: [
                                 Shadow(
-                                  color: Colors.black.withValues(
-                                      alpha: isDark ? 0.6 : 0.15),
-                                  blurRadius: 8,
+                                  color: Colors.black
+                                      .withValues(alpha: isDark ? 0.65 : 0.22),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 1),
                                 ),
+                                if (isDark)
+                                  Shadow(
+                                    color: Colors.black.withValues(alpha: 0.9),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 0),
+                                  ),
                               ],
                             ),
-                            tooltip: connected
-                                ? 'Пульт · подключено'
-                                : (hasDevices
-                                    ? 'Пульт · ПК рядом'
-                                    : 'Пульт · найти ПК'),
-                            onPressed: () {
-                              NavigationHelper.push(context,
-                                  const RemoteControlScreen());
-                            },
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          if (!connected && hasDevices)
-                            Positioned(
-                              right: 10,
-                              top: 10,
-                              child: Container(
-                                width: 9,
-                                height: 9,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF4E8CA8),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                          if (connected)
-                            Positioned(
-                              right: 10,
-                              top: 10,
-                              child: Container(
-                                width: 9,
-                                height: 9,
-                                decoration: const BoxDecoration(
-                                  color: Colors.green,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                        ],
-                      );
-                    },
+                        ),
+                      ),
+                    ),
                   ),
-                  if (isDesktop) const SizedBox(width: 8),
-                  ArrivalsBell(
-                      iconColor: isDark ? Colors.white : Colors.black),
-                ],
-              ),
-          SliverToBoxAdapter(
-            child: Consumer4<LibraryProvider, RecommendationService, YandexMusicProvider, MLService>(
-              builder: (context, libraryProvider, recommendationService, yandexProvider, mlService, _) {
-                if (libraryProvider.isLoading &&
-                    !libraryProvider.isInitialized) {
-                  return _buildLoadingState(isDesktop, hPad);
-                }
-
-                final allSongs = libraryProvider.randomSongs;
-                final key = _computeRandomKey(allSongs) +
-                    '|' +
-                    recommendationService.bannedArtistsKey;
-
-                if (recommendationService.enabled && key.isNotEmpty) {
-                  if (key != _lastRandomKey) {
-                    // В офлайне — только играемое (скачанное/локальное),
-                    // иначе волна генерилась из серверных треков без файлов.
-                    final sourceSongs = libraryProvider.isOfflineNow
-                        ? libraryProvider.playablePool()
-                        : (libraryProvider.cachedAllSongs.isNotEmpty
-                            ? libraryProvider.cachedAllSongs
-                            : allSongs);
-                    var filteredSongs = libraryProvider.mergeLocalLibrary
-                        ? sourceSongs
-                        : sourceSongs.where((s) => !s.isLocal).toList();
-                    // Fallback to source if filtering emptied the pool (e.g. only locals in DB)
-                    if (filteredSongs.isEmpty && sourceSongs.isNotEmpty) {
-                      filteredSongs = sourceSongs;
-                    }
-                    // Стадия 1 — волна сразу (дешёвая, 30 шт): hero играет мгновенно.
-                    // Старые кэши не сбрасываем в пустоту — волна остаётся тапабельной.
-                    // Стадия 2 — миксы только после синка, из синхронизированной БД.
-                    final wavePool = List<Song>.from(filteredSongs);
-                    final waveKey = key;
-                    final libRef = libraryProvider;
-                    final recRef = recommendationService;
-                    final mlRef = mlService;
-                    // Генерация волны со спиннером как на ПК (isGenerating):
-                    // кадр N+1 рисует спиннер, тяжёлый скоринг — после его
-                    // отрисовки (иначе спиннер не успевает показаться).
-                    _waveGenerating = true;
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (!mounted) return;
-                      setState(() {});
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (!mounted || _lastRandomKey != waveKey) return;
-                        final myWave = mlRef.generateLocalMyWave(
-                          songs: wavePool,
-                          count: 30,
-                        );
-                        if (!mounted || _lastRandomKey != waveKey) return;
-                        setState(() {
-                          _cachedMyWave = myWave;
-                          _waveGenerating = false;
-                        });
-                      try {
-                        MixCacheService().saveHome(
-                          waveKey, const {}, const [], myWave);
-                      } catch (_) {}
-                      final myWaveIds = myWave.map((s) => s.id).toSet();
-                      final remaining = wavePool.where((s) => !myWaveIds.contains(s.id)).toList();
-                      final poolForMixes = remaining.length >= 15 ? remaining : wavePool;
-                      // Персоналка асинхронно — убирает лаг 5с при тапе звезд.
-                      final cachedPool = List<Song>.from(poolForMixes);
-                      Future.microtask(() {
-                        final feed = recRef.getPersonalizedFeed(cachedPool, limit: 10);
-                        if (!mounted || _lastRandomKey != waveKey) return;
-                        setState(() => _cachedPersonalized = feed);
-                      });
-                      // Миксы — только когда синк не пишет в БД.
-                      // Единый лоадер (SharedMixesLoader): тот же ключ/пул что
-                      // у экрана Миксов + single-flight — изолят считается
-                      // один раз на оба экрана, второй читает кэш/ждёт Future.
-                      Future(() async {
-                        for (var i = 0; i < 90; i++) {
-                          if (!mounted || _lastRandomKey != waveKey) return;
-                          if (!libRef.isSyncing) break;
-                          await Future.delayed(const Duration(seconds: 1));
-                        }
-                        if (!mounted || _lastRandomKey != waveKey) return;
-                        if (libRef.isSyncing) return;
-                        final freshPool = await libRef.getPoolForMix(limit: 700);
-                        final pool = freshPool.length >= 15 ? freshPool : poolForMixes;
-                        final mixes = await SharedMixesLoader().getAllMixes(
-                          pool: pool,
-                          bannedKey: recRef.bannedArtistsKey,
-                          rec: recRef,
-                        );
-                        if (!mounted || _lastRandomKey != waveKey) return;
-                        if (mixes.isEmpty) return;
-                        setState(() => _cachedMixes = mixes);
-                      });
-                      });
-                    });
-                    // AI Mix: 12 diverse tracks under My Wave
-                    if (PlayerUiSettingsService().getHomeShowAiMix()) {
-                      final aiPool = List<Song>.from(filteredSongs)..shuffle();
-                      final aiMix = <Song>[];
-                      final seenAiArtists = <String>{};
-                      for (final s in aiPool) {
-                        if (s.artist != null && seenAiArtists.add(s.artist!.toLowerCase())) aiMix.add(s);
-                        else if (s.artist == null) aiMix.add(s);
-                        if (aiMix.length >= 12) break;
+                  actions: [
+                    if (isDesktop) const SizedBox(width: 8),
+                    ArrivalsBell(
+                        iconColor: isDark ? Colors.white : Colors.black),
+                    IconButton(
+                      icon: AnimatedRotation(
+                        turns: _showQuickActions ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 220),
+                        child: Icon(Icons.keyboard_arrow_down_rounded,
+                            color: isDark ? Colors.white : Colors.black),
+                      ),
+                      tooltip: _showQuickActions
+                          ? 'Свернуть действия'
+                          : 'Показать действия',
+                      onPressed: () => setState(
+                          () => _showQuickActions = !_showQuickActions),
+                    ),
+                  ],
+                ),
+                SliverToBoxAdapter(
+                  child: Consumer4<LibraryProvider, RecommendationService,
+                      YandexMusicProvider, MLService>(
+                    builder: (context, libraryProvider, recommendationService,
+                        yandexProvider, mlService, _) {
+                      if (libraryProvider.isLoading &&
+                          !libraryProvider.isInitialized) {
+                        return _buildLoadingState(isDesktop, hPad);
                       }
-                      if (aiMix.length < 12) {
-                        for (final s in aiPool) {
-                          if (!aiMix.any((r) => r.id == s.id)) {
-                            aiMix.add(s);
-                            if (aiMix.length >= 12) break;
+
+                      final allSongs = libraryProvider.randomSongs;
+                      final key = _computeRandomKey(allSongs) +
+                          '|' +
+                          recommendationService.bannedArtistsKey;
+
+                      if (recommendationService.enabled && key.isNotEmpty) {
+                        if (key != _lastRandomKey) {
+                          // В офлайне — только играемое (скачанное/локальное),
+                          // иначе волна генерилась из серверных треков без файлов.
+                          final sourceSongs = libraryProvider.isOfflineNow
+                              ? libraryProvider.playablePool()
+                              : (libraryProvider.cachedAllSongs.isNotEmpty
+                                  ? libraryProvider.cachedAllSongs
+                                  : allSongs);
+                          var filteredSongs = libraryProvider.mergeLocalLibrary
+                              ? sourceSongs
+                              : sourceSongs.where((s) => !s.isLocal).toList();
+                          // Fallback to source if filtering emptied the pool (e.g. only locals in DB)
+                          if (filteredSongs.isEmpty && sourceSongs.isNotEmpty) {
+                            filteredSongs = sourceSongs;
                           }
-                        }
-                      }
-                      _cachedAiMix = aiMix;
-                      _cachedAiMixName = 'AI Mix';
-                      if (aiMix.isNotEmpty && AiService().isConfigured) {
-                        final ai = AiService();
-                        Future(() async {
-                          try {
-                            final aiName = await ai.generateMixName(aiMix, hint: 'AI mix');
-                            if (mounted && _lastRandomKey == key && aiName.isNotEmpty) {
-                              setState(() => _cachedAiMixName = aiName);
+                          // Стадия 1 — волна сразу (дешёвая, 30 шт): hero играет мгновенно.
+                          // Старые кэши не сбрасываем в пустоту — волна остаётся тапабельной.
+                          // Стадия 2 — миксы только после синка, из синхронизированной БД.
+                          final wavePool = List<Song>.from(filteredSongs);
+                          final waveKey = key;
+                          final libRef = libraryProvider;
+                          final recRef = recommendationService;
+                          final mlRef = mlService;
+                          // Генерация волны со спиннером как на ПК (isGenerating):
+                          // кадр N+1 рисует спиннер, тяжёлый скоринг — после его
+                          // отрисовки (иначе спиннер не успевает показаться).
+                          _waveGenerating = true;
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (!mounted) return;
+                            setState(() {});
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (!mounted || _lastRandomKey != waveKey) return;
+                              final myWave = mlRef.generateLocalMyWave(
+                                songs: wavePool,
+                                count: 30,
+                              );
+                              if (!mounted || _lastRandomKey != waveKey) return;
+                              setState(() {
+                                _cachedMyWave = myWave;
+                                _waveGenerating = false;
+                              });
+                              try {
+                                MixCacheService().saveHome(
+                                    waveKey, const {}, const [], myWave);
+                              } catch (_) {}
+                              final myWaveIds = myWave.map((s) => s.id).toSet();
+                              final remaining = wavePool
+                                  .where((s) => !myWaveIds.contains(s.id))
+                                  .toList();
+                              final poolForMixes =
+                                  remaining.length >= 15 ? remaining : wavePool;
+                              // Персоналка асинхронно — убирает лаг 5с при тапе звезд.
+                              final cachedPool = List<Song>.from(poolForMixes);
+                              Future.microtask(() {
+                                final feed = recRef
+                                    .getPersonalizedFeed(cachedPool, limit: 10);
+                                if (!mounted || _lastRandomKey != waveKey)
+                                  return;
+                                setState(() => _cachedPersonalized = feed);
+                              });
+                              // Миксы — только когда синк не пишет в БД.
+                              // Единый лоадер (SharedMixesLoader): тот же ключ/пул что
+                              // у экрана Миксов + single-flight — изолят считается
+                              // один раз на оба экрана, второй читает кэш/ждёт Future.
+                              Future(() async {
+                                for (var i = 0; i < 90; i++) {
+                                  if (!mounted || _lastRandomKey != waveKey)
+                                    return;
+                                  if (!libRef.isSyncing) break;
+                                  await Future.delayed(
+                                      const Duration(seconds: 1));
+                                }
+                                if (!mounted || _lastRandomKey != waveKey)
+                                  return;
+                                if (libRef.isSyncing) return;
+                                final freshPool =
+                                    await libRef.getPoolForMix(limit: 700);
+                                final pool = freshPool.length >= 15
+                                    ? freshPool
+                                    : poolForMixes;
+                                final mixes =
+                                    await SharedMixesLoader().getAllMixes(
+                                  pool: pool,
+                                  bannedKey: recRef.bannedArtistsKey,
+                                  rec: recRef,
+                                );
+                                if (!mounted || _lastRandomKey != waveKey)
+                                  return;
+                                if (mixes.isEmpty) return;
+                                setState(() => _cachedMixes = mixes);
+                              });
+                            });
+                          });
+                          // AI Mix: 12 diverse tracks under My Wave
+                          if (PlayerUiSettingsService().getHomeShowAiMix()) {
+                            final aiPool = List<Song>.from(filteredSongs)
+                              ..shuffle();
+                            final aiMix = <Song>[];
+                            final seenAiArtists = <String>{};
+                            for (final s in aiPool) {
+                              if (s.artist != null &&
+                                  seenAiArtists.add(s.artist!.toLowerCase()))
+                                aiMix.add(s);
+                              else if (s.artist == null) aiMix.add(s);
+                              if (aiMix.length >= 12) break;
                             }
-                          } catch (_) {}
+                            if (aiMix.length < 12) {
+                              for (final s in aiPool) {
+                                if (!aiMix.any((r) => r.id == s.id)) {
+                                  aiMix.add(s);
+                                  if (aiMix.length >= 12) break;
+                                }
+                              }
+                            }
+                            _cachedAiMix = aiMix;
+                            _cachedAiMixName = 'AI Mix';
+                            if (aiMix.isNotEmpty && AiService().isConfigured) {
+                              final ai = AiService();
+                              Future(() async {
+                                try {
+                                  final aiName = await ai.generateMixName(aiMix,
+                                      hint: 'AI mix');
+                                  if (mounted &&
+                                      _lastRandomKey == key &&
+                                      aiName.isNotEmpty) {
+                                    setState(() => _cachedAiMixName = aiName);
+                                  }
+                                } catch (_) {}
+                              });
+                            }
+                          } else {
+                            _cachedAiMix = const [];
+                            _cachedAiMixName = 'AI Mix';
+                          }
+                          _lastRandomKey = key;
+                          // Ежедневный ИИ-микс: раньше generateDailyAutoMix никто не
+                          // вызывал автоматически (только кнопка force:true), поэтому
+                          // «следующий день» никогда не наступал. Пианим фоном —
+                          // внутри self-guard через shouldGenerateDaily (раз в сутки).
+                          _ensureAiDailyMix(filteredSongs);
+                        }
+                      } else {
+                        _cachedMixes = const {};
+                        _cachedPersonalized = const [];
+                        _cachedMyWave = const [];
+                        _waveGenerating = false;
+                        _cachedAiMix = const [];
+                        _cachedAiMixName = 'AI Mix';
+                        _lastRandomKey = '';
+                      }
+
+                      final mixes = _cachedMixes;
+                      final personalizedFeed = _cachedPersonalized;
+                      final myWaveSongs = _cachedMyWave;
+
+                      // Фоновая Yandex-обогащение — троттлим до 1 раза в 60с, иначе каждый build спамит getAlbum (лог Enrich skip)
+                      if (libraryProvider.cachedAllSongs.isNotEmpty &&
+                          DateTime.now().difference(_lastEnrichAt).inSeconds >
+                              60) {
+                        _lastEnrichAt = DateTime.now();
+                        Future.microtask(() {
+                          mlService.enrichMissingGenres(
+                              libraryProvider.cachedAllSongs,
+                              limit: 15);
                         });
                       }
-                    } else {
-                      _cachedAiMix = const [];
-                      _cachedAiMixName = 'AI Mix';
-                    }
-                    _lastRandomKey = key;
-                    // Ежедневный ИИ-микс: раньше generateDailyAutoMix никто не
-                    // вызывал автоматически (только кнопка force:true), поэтому
-                    // «следующий день» никогда не наступал. Пианим фоном —
-                    // внутри self-guard через shouldGenerateDaily (раз в сутки).
-                    _ensureAiDailyMix(filteredSongs);
-                  }
-                } else {
-                  _cachedMixes = const {};
-                  _cachedPersonalized = const [];
-                  _cachedMyWave = const [];
-                  _waveGenerating = false;
-                  _cachedAiMix = const [];
-                  _cachedAiMixName = 'AI Mix';
-                  _lastRandomKey = '';
-                }
 
-                final mixes = _cachedMixes;
-                final personalizedFeed = _cachedPersonalized;
-                final myWaveSongs = _cachedMyWave;
+                      return Padding(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: isDesktop ? 0 : 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Hero: Моя волна. V1 (KION) и V2 (как на ПК) — независимые
+                            // тумблеры: выключенный KION больше не гасит V2.
+                            if (libraryProvider.randomSongs.isNotEmpty)
+                              ListenableBuilder(
+                                listenable: Listenable.merge([
+                                  PlayerUiSettingsService()
+                                      .homeMyWaveV2Notifier,
+                                  PlayerUiSettingsService()
+                                      .homeShowMyWaveNotifier,
+                                ]),
+                                builder: (lctx, __) {
+                                  final ui = PlayerUiSettingsService();
+                                  final v1 = ui.getHomeShowMyWave();
+                                  final v2 = ui.getHomeMyWaveV2();
+                                  if (!v1 && !v2) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  final subsonicService =
+                                      Provider.of<SubsonicService>(lctx,
+                                          listen: false);
+                                  final displaySongs = myWaveSongs.isNotEmpty
+                                      ? myWaveSongs
+                                      : libraryProvider.randomSongs;
+                                  void playWave() {
+                                    final player = lctx.read<PlayerProvider>();
+                                    final curId = player.currentSong?.id;
+                                    // Волна активна — по имени очереди как на ПК
+                                    // (continue/resume подменяет очередь, трека уже
+                                    // может не быть в hero-списке).
+                                    final isWavePlaying = isWavePlayingNow(
+                                      isPlaying: player.isPlaying,
+                                      currentSongId: curId,
+                                      heroIds: [
+                                        for (final s in displaySongs) s.id
+                                      ],
+                                      queueName: player.currentQueueName,
+                                    );
+                                    if (isWavePlaying) {
+                                      player.pause();
+                                      return;
+                                    }
+                                    if (player.currentSong != null &&
+                                        displaySongs
+                                            .any((s) => s.id == curId)) {
+                                      player.togglePlayPause();
+                                      return;
+                                    }
+                                    // Обычная волна гасит сид (десктоп clearWaveSeed).
+                                    clearWaveSeed();
+                                    saveWaveContext(
+                                        displaySongs.map((s) => s.id).toList(),
+                                        '',
+                                        'local');
+                                    final randomIndex =
+                                        (displaySongs.length > 1)
+                                            ? (DateTime.now()
+                                                    .millisecondsSinceEpoch %
+                                                displaySongs.length)
+                                            : 0;
+                                    player.playSong(displaySongs[randomIndex],
+                                        playlist: displaySongs,
+                                        startIndex: randomIndex,
+                                        playlistName: 'Моя волна',
+                                        isWave: true);
+                                  }
 
-                // Фоновая Yandex-обогащение — троттлим до 1 раза в 60с, иначе каждый build спамит getAlbum (лог Enrich skip)
-                if (libraryProvider.cachedAllSongs.isNotEmpty &&
-                    DateTime.now().difference(_lastEnrichAt).inSeconds > 60) {
-                  _lastEnrichAt = DateTime.now();
-                  Future.microtask(() {
-                    mlService.enrichMissingGenres(libraryProvider.cachedAllSongs, limit: 15);
-                  });
-                }
+                                  void shuffleWave() {
+                                    final songs = List<Song>.from(displaySongs)
+                                      ..shuffle();
+                                    clearWaveSeed();
+                                    saveWaveContext(
+                                        songs.map((s) => s.id).toList(),
+                                        '',
+                                        'local');
+                                    lctx.read<PlayerProvider>().playSong(
+                                        songs.first,
+                                        playlist: songs,
+                                        playlistName: 'Моя волна',
+                                        isWave: true);
+                                  }
 
-                return Padding(
-                  padding: EdgeInsets.symmetric(horizontal: isDesktop ? 0 : 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Hero: Моя волна. V1 (KION) и V2 (как на ПК) — независимые
-                      // тумблеры: выключенный KION больше не гасит V2.
-                      if (libraryProvider.randomSongs.isNotEmpty)
-                        ListenableBuilder(
-                          listenable: Listenable.merge([
-                            PlayerUiSettingsService().homeMyWaveV2Notifier,
-                            PlayerUiSettingsService().homeShowMyWaveNotifier,
-                          ]),
-                          builder: (lctx, __) {
-                            final ui = PlayerUiSettingsService();
-                            final v1 = ui.getHomeShowMyWave();
-                            final v2 = ui.getHomeMyWaveV2();
-                            if (!v1 && !v2) {
-                              return const SizedBox.shrink();
-                            }
-                            final subsonicService =
-                                Provider.of<SubsonicService>(lctx, listen: false);
-                            final displaySongs = myWaveSongs.isNotEmpty
-                                ? myWaveSongs
-                                : libraryProvider.randomSongs;
-                            void playWave() {
-                              final player = lctx.read<PlayerProvider>();
-                              final curId = player.currentSong?.id;
-                              // Волна активна — по имени очереди как на ПК
-                              // (continue/resume подменяет очередь, трека уже
-                              // может не быть в hero-списке).
-                              final isWavePlaying = isWavePlayingNow(
-                                isPlaying: player.isPlaying,
-                                currentSongId: curId,
-                                heroIds: [for (final s in displaySongs) s.id],
-                                queueName: player.currentQueueName,
-                              );
-                              if (isWavePlaying) {
-                                player.pause();
-                                return;
-                              }
-                              if (player.currentSong != null && displaySongs.any((s) => s.id == curId)) {
-                                player.togglePlayPause();
-                                return;
-                              }
-                              // Обычная волна гасит сид (десктоп clearWaveSeed).
-                              clearWaveSeed();
-                              saveWaveContext(
-                                  displaySongs.map((s) => s.id).toList(),
-                                  '',
-                                  'local');
-                              final randomIndex = (displaySongs.length > 1) ? (DateTime.now().millisecondsSinceEpoch % displaySongs.length) : 0;
-                              player.playSong(
-                                  displaySongs[randomIndex],
-                                  playlist: displaySongs,
-                                  startIndex: randomIndex,
-                                  playlistName: 'Моя волна',
-                                  isWave: true);
-                            }
+                                  String? coverFor(List<Song> songs) =>
+                                      songs.isNotEmpty
+                                          ? subsonicService.getCoverArtUrl(
+                                              songs.first.coverArt ?? '',
+                                              size: 600,
+                                            )
+                                          : null;
 
-                            void shuffleWave() {
-                              final songs = List<Song>.from(displaySongs)..shuffle();
-                              clearWaveSeed();
-                              saveWaveContext(
-                                  songs.map((s) => s.id).toList(), '', 'local');
-                              lctx.read<PlayerProvider>().playSong(
-                                  songs.first,
-                                  playlist: songs,
-                                  playlistName: 'Моя волна',
-                                  isWave: true);
-                            }
-
-                            String? coverFor(List<Song> songs) =>
-                                songs.isNotEmpty
-                                    ? subsonicService.getCoverArtUrl(
-                                        songs.first.coverArt ?? '',
-                                        size: 600,
-                                      )
-                                    : null;
-
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 16),
-                                // Заголовок секции — только у V1 (у V2 как на ПК
-                                // его нет: приветствие отдельно, hero самодостаточен).
-                                if (v1)
-                                  _SectionTitle(
-                                    title: 'Моя волна',
-                                    subtitle: 'Персональный микс',
-                                    icon: Icons.waves_rounded,
-                                    hPad: hPad,
-                                    trailing: IconButton(
-                                      icon: const Icon(Icons.refresh_rounded, size: 20),
-                                      tooltip: 'Обновить волну',
-                                      onPressed: _refreshMyWave,
-                                    ),
-                                  ),
-                                if (v2)
-                                  Consumer<PlayerProvider>(
-                                    builder: (pctx, player, __) {
-                                      final cur = player.currentSong;
-                                      return KumaHeroV2(
-                                        songs: displaySongs,
-                                        filtersVersion: _waveFiltersVersion,
-                                        coverUrl: coverFor(displaySongs),
-                                        isGenerating: _waveGenerating,
-                                        currentCoverArt: cur?.coverArt,
-                                        currentGenre: cur?.genre,
-                                        onPlay: playWave,
-                                        onShuffle: shuffleWave,
-                                        onCustomize: () =>
-                                            _showMyWaveCustomize(lctx, displaySongs),
-                                      );
-                                    },
-                                  )
-                                else
-                                  KumaFlowMyWaveHero(
-                                    songs: displaySongs,
-                                    filtersVersion: _waveFiltersVersion,
-                                    coverUrl: coverFor(displaySongs),
-                                    isGenerating: _waveGenerating,
-                                    onPlay: playWave,
-                                    onShuffle: shuffleWave,
-                                    onCustomize: () =>
-                                        _showMyWaveCustomize(lctx, displaySongs),
-                                  ),
-                              ],
-                            );
-                          },
-                        ),
-                      // AI Mix carousel — теперь независим от Моя волна
-                      if (PlayerUiSettingsService().getHomeShowAiMix() && _cachedAiMix.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        _SectionTitle(
-                          title: _cachedAiMixName,
-                          subtitle: 'ИИ подборка',
-                          icon: Icons.auto_awesome_rounded,
-                          hPad: hPad,
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          height: 160,
-                          child: ListView.separated(
-                            padding: EdgeInsets.symmetric(horizontal: hPad),
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _cachedAiMix.length,
-                            separatorBuilder: (_, __) => const SizedBox(width: 12),
-                            itemBuilder: (ctx, i) {
-                              final song = _cachedAiMix[i];
-                              final subsonic = Provider.of<SubsonicService>(ctx, listen: false);
-                              final cover = subsonic.getCoverArtUrl(song.coverArt ?? '', size: 300);
-                              return GestureDetector(
-                                onTap: () => ctx.read<PlayerProvider>().playSong(song, playlist: _cachedAiMix, startIndex: i),
-                                child: SizedBox(
-                                  width: 120,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: cover.isNotEmpty
-                                            ? CachedNetworkImage(imageUrl: cover, width: 120, height: 120, fit: BoxFit.cover, errorWidget: (_, __, ___) => Container(width: 120, height: 120, color: Colors.grey[800], child: const Icon(Icons.music_note, color: Colors.white54)))
-                                            : Container(width: 120, height: 120, color: Colors.grey[800], child: const Icon(Icons.music_note, color: Colors.white54)),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                                      Text(song.artist ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+                                      const SizedBox(height: 16),
+                                      // Заголовок секции — только у V1 (у V2 как на ПК
+                                      // его нет: приветствие отдельно, hero самодостаточен).
+                                      if (v1)
+                                        _SectionTitle(
+                                          title: 'Моя волна',
+                                          subtitle: 'Персональный микс',
+                                          icon: Icons.waves_rounded,
+                                          hPad: hPad,
+                                          trailing: IconButton(
+                                            icon: const Icon(
+                                                Icons.refresh_rounded,
+                                                size: 20),
+                                            tooltip: 'Обновить волну',
+                                            onPressed: _refreshMyWave,
+                                          ),
+                                        ),
+                                      if (v2)
+                                        Consumer<PlayerProvider>(
+                                          builder: (pctx, player, __) {
+                                            final cur = player.currentSong;
+                                            return KumaHeroV2(
+                                              songs: displaySongs,
+                                              filtersVersion:
+                                                  _waveFiltersVersion,
+                                              coverUrl: coverFor(displaySongs),
+                                              isGenerating: _waveGenerating,
+                                              currentCoverArt: cur?.coverArt,
+                                              currentGenre: cur?.genre,
+                                              onPlay: playWave,
+                                              onShuffle: shuffleWave,
+                                              onCustomize: () =>
+                                                  _showMyWaveCustomize(
+                                                      lctx, displaySongs),
+                                            );
+                                          },
+                                        )
+                                      else
+                                        KumaFlowMyWaveHero(
+                                          songs: displaySongs,
+                                          filtersVersion: _waveFiltersVersion,
+                                          coverUrl: coverFor(displaySongs),
+                                          isGenerating: _waveGenerating,
+                                          onPlay: playWave,
+                                          onShuffle: shuffleWave,
+                                          onCustomize: () =>
+                                              _showMyWaveCustomize(
+                                                  lctx, displaySongs),
+                                        ),
                                     ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-
-                      // Yandex My Wave section — только при включённой интеграции.
-                      if (PlayerUiSettingsService().getHomeShowYandex() &&
-                          yandexProvider.isEnabled) ...[
-                        const SizedBox(height: 16),
-                        YandexMyWaveSection(
-                          hPad: hPad,
-                          isDesktop: isDesktop,
-                        ),
-                      ],
-
-                      // Genre carousel — независим от Моя волна
-                      if (PlayerUiSettingsService().getHomeShowGenre()) ...[
-                        const SizedBox(height: 24),
-                        GenreCarousel(
-                          hPad: hPad,
-                          isDesktop: isDesktop,
-                          onGenreTap: (genreId, genreName, color) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => GenrePlaylistScreen(
-                                  genreId: genreId,
-                                  genreName: genreName,
-                                  genreColor: color,
-                                ),
+                                  );
+                                },
                               ),
-                            );
-                          },
-                        ),
-                      ],
-
-                      // Continue Listening — Books (outside MyWave)
-                      ValueListenableBuilder<bool>(
-                        valueListenable: AudiobookshelfService().enabledNotifier,
-                        builder: (ctx, absEnabled, __) {
-                          if (!absEnabled || !AudiobookshelfService().isConfigured) return const SizedBox.shrink();
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                            // AI Mix carousel — теперь независим от Моя волна
+                            if (PlayerUiSettingsService().getHomeShowAiMix() &&
+                                _cachedAiMix.isNotEmpty) ...[
                               const SizedBox(height: 16),
                               _SectionTitle(
-                                title: 'Продолжить слушать',
-                                subtitle: 'Книги',
-                                icon: Icons.menu_book_rounded,
+                                title: _cachedAiMixName,
+                                subtitle: 'ИИ подборка',
+                                icon: Icons.auto_awesome_rounded,
                                 hPad: hPad,
                               ),
                               const SizedBox(height: 8),
                               SizedBox(
-                                height: 170,
-                                child: FutureBuilder<List<Map<String, dynamic>>>(
-                                  future: _getBooksFuture(),
-                                  builder: (ctx, snap) {
-                                    if (snap.connectionState == ConnectionState.waiting) {
-                                      return const Center(child: CircularProgressIndicator());
-                                    }
-                                    final books = snap.data ?? [];
-                                    if (books.isEmpty) {
-                                      return const Center(child: Text('Нет книг в прогрессе', style: TextStyle(fontSize: 12, color: Colors.grey)));
-                                    }
-                                    return ListView.separated(
-                                      padding: EdgeInsets.symmetric(horizontal: hPad),
-                                      scrollDirection: Axis.horizontal,
-                                      itemCount: books.length,
-                                      separatorBuilder: (_, __) => const SizedBox(width: 12),
-                                      itemBuilder: (c, i) {
-                                        final b = books[i];
-                                        final id = b['id'] as String? ?? b['libraryItemId'] as String? ?? '';
-                                        final media = b['media'] ?? b['libraryItem']?['media'];
-                                        final title = media?['metadata']?['title'] ?? b['media']?['metadata']?['title'] ?? b['title'] ?? 'Unknown';
-                                        final author = media?['metadata']?['authorName'] ?? b['media']?['metadata']?['authorName'] ?? '';
-                                        final cover = AudiobookshelfService().getCoverUrl(id, width: 200);
-                                        final headers = AudiobookshelfService().authHeaders;
-                                        // Robust progress extraction
-                                        double progRaw = 0;
-                                        bool isFinishedRaw = false;
-                                        double curTime = 0;
-                                        double durForCur = 0;
-                                        try {
-                                          durForCur = (media?['duration'] as num?)?.toDouble() ?? (b['media']?['duration'] as num?)?.toDouble() ?? 0;
-                                          final embedded = b['userMediaProgress'] as Map<String, dynamic>?;
-                                          if (embedded != null) {
-                                            progRaw = (embedded['progress'] as num?)?.toDouble() ?? 0;
-                                            isFinishedRaw = embedded['isFinished'] as bool? ?? false;
-                                            curTime = (embedded['currentTime'] as num?)?.toDouble() ?? 0;
-                                            if (durForCur > 0 && progRaw == 0 && curTime > 0) progRaw = (curTime / durForCur).clamp(0,1).toDouble();
-                                            if (curTime == 0 && progRaw > 0 && durForCur > 0) curTime = progRaw * durForCur;
-                                            if (curTime == 0 && progRaw == 0) {
-                                              // Try alternative currentTime location
-                                              curTime = (b['progress'] as num?)?.toDouble() ?? 0;
-                                              if (curTime > 0 && curTime <= 1 && durForCur > 0) { progRaw = curTime; curTime = progRaw * durForCur; }
-                                            }
-                                          }
-                                          if (progRaw == 0) {
-                                            progRaw = (b['progress'] as num?)?.toDouble() ?? 0;
-                                            if (progRaw > 0 && curTime == 0 && durForCur > 0) curTime = progRaw * durForCur;
-                                          }
-                                        } catch (_) {}
-                                        final isFinished = isFinishedRaw || progRaw >= 0.99;
-                                        final prog = progRaw.clamp(0, 1).toDouble();
-                                        return SizedBox(
-                                          width: 130,
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Stack(
-                                                children: [
-                                                  GestureDetector(
-                                                    onTap: () => Navigator.push(c, MaterialPageRoute(builder: (_) => AudiobookDetailScreen(itemId: id, initialData: b))),
-                                                    child: ClipRRect(
-                                                      borderRadius: BorderRadius.circular(12),
-                                                      child: cover.isNotEmpty
-                                                          ? CachedNetworkImage(imageUrl: cover, httpHeaders: headers, width: 130, height: 110, fit: BoxFit.cover, errorWidget: (_, __, ___) => Container(width: 130, height: 110, color: Colors.grey[800], child: const Icon(Icons.menu_book, color: Colors.white54)))
-                                                          : Container(width: 130, height: 110, color: Colors.grey[800], child: const Icon(Icons.menu_book, color: Colors.white54)),
-                                                    ),
-                                                  ),
-                                                  Positioned(
-                                                    bottom: 6,
-                                                    right: 6,
-                                                    child: Material(
-                                                      color: Theme.of(c).colorScheme.primary,
-                                                      elevation: 4,
-                                                      shape: const CircleBorder(),
-                                                      child: InkWell(
-                                                        customBorder: const CircleBorder(),
-                                                        onTap: () async {
-                                                          final messenger = ScaffoldMessenger.of(c);
-                                                          try {
-                                                            // Use curTime if >5 sec, else try to derive from progress
-                                                            double st = curTime;
-                                                            if (st == 0 && prog > 0 && durForCur > 0) st = prog * durForCur;
-                                                            // If still 0 and book has progress, pass null to let helper fetch fresh progress
-                                                            final double? toPass = st > 5 ? st : null;
-                                                            if (toPass != null) {
-                                                              await AudiobookHelper.playBook(c, id, b, startTime: toPass);
-                                                            } else {
-                                                              await AudiobookHelper.playBook(c, id, b);
-                                                            }
-                                                          } catch (e) {
-                                                            messenger.showSnackBar(SnackBar(content: Text('Ошибка: $e')));
-                                                          }
-                                                        },
-                                                        child: const Padding(padding: EdgeInsets.all(10), child: Icon(Icons.play_arrow_rounded, size: 28, color: Colors.white)),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  Positioned(
-                                                    top: 4,
-                                                    right: 4,
-                                                    child: PopupMenuButton<String>(
-                                                      padding: EdgeInsets.zero,
-                                                      icon: Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.more_horiz, size: 12, color: Colors.white)),
-                                                      onSelected: (v) async {
-                                                        if (v == 'detail') Navigator.push(c, MaterialPageRoute(builder: (_) => AudiobookDetailScreen(itemId: id, initialData: b)));
-                                                        if (v == 'download') {
-                                                          final svc = AudiobookshelfService();
-                                                          final detail = await svc.fetchBookDetail(id) ?? b;
-                                                          final files = svc.getAudioFiles(detail);
-                                                          final off = OfflineService(); await off.init();
-                                                          await off.downloadBook(itemId: id, audioFiles: files, baseUrl: svc.getUrl(), token: svc.getToken());
-                                                          if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(const SnackBar(content: Text('Книга скачана')));
-                                                        }
-                                                        if (v == 'delete') {
-                                                          final off = OfflineService(); await off.init(); await off.deleteBook(id);
-                                                          if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(const SnackBar(content: Text('Кэш удалён')));
-                                                        }
-                                                      },
-                                                      itemBuilder: (_) => const [
-                                                        PopupMenuItem(value: 'detail', child: Text('Подробнее')),
-                                                        PopupMenuItem(value: 'download', child: Text('Скачать')),
-                                                        PopupMenuItem(value: 'delete', child: Text('Удалить кэш')),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 6),
-                                              Text(title.toString(), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                                              Text(author.toString(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
-                                              if (prog > 0) Padding(padding: const EdgeInsets.only(top: 4), child: LinearProgressIndicator(value: prog, minHeight: 2, backgroundColor: Colors.grey[300], valueColor: AlwaysStoppedAnimation(isFinished ? Colors.green : Theme.of(c).colorScheme.primary))),
-                                              if (isFinished) const Padding(padding: EdgeInsets.only(top: 2), child: Text('Завершено', style: TextStyle(fontSize: 9, color: Colors.green))),
-                                            ],
-                                          ),
-                                        );
-                                      },
+                                height: 160,
+                                child: ListView.separated(
+                                  padding:
+                                      EdgeInsets.symmetric(horizontal: hPad),
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: _cachedAiMix.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(width: 12),
+                                  itemBuilder: (ctx, i) {
+                                    final song = _cachedAiMix[i];
+                                    final subsonic =
+                                        Provider.of<SubsonicService>(ctx,
+                                            listen: false);
+                                    final cover = subsonic.getCoverArtUrl(
+                                        song.coverArt ?? '',
+                                        size: 300);
+                                    return GestureDetector(
+                                      onTap: () => ctx
+                                          .read<PlayerProvider>()
+                                          .playSong(song,
+                                              playlist: _cachedAiMix,
+                                              startIndex: i),
+                                      child: SizedBox(
+                                        width: 120,
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              child: cover.isNotEmpty
+                                                  ? CachedNetworkImage(
+                                                      imageUrl: cover,
+                                                      width: 120,
+                                                      height: 120,
+                                                      fit: BoxFit.cover,
+                                                      errorWidget: (_, __,
+                                                              ___) =>
+                                                          Container(
+                                                              width: 120,
+                                                              height: 120,
+                                                              color: Colors
+                                                                  .grey[800],
+                                                              child: const Icon(
+                                                                  Icons
+                                                                      .music_note,
+                                                                  color: Colors
+                                                                      .white54)))
+                                                  : Container(
+                                                      width: 120,
+                                                      height: 120,
+                                                      color: Colors.grey[800],
+                                                      child: const Icon(
+                                                          Icons.music_note,
+                                                          color:
+                                                              Colors.white54)),
+                                            ),
+                                            const SizedBox(height: 6),
+                                            Text(song.title,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight:
+                                                        FontWeight.w600)),
+                                            Text(song.artist ?? '',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.grey[600])),
+                                          ],
+                                        ),
+                                      ),
                                     );
                                   },
                                 ),
                               ),
                             ],
-                          );
-                        },
-                      ),
 
-                      if (PlayerUiSettingsService().getHomeShowRecent()) ...[
-                        Builder(builder: (ctx) {
-                          final off = OfflineService();
-                          final isOffline = off.isOfflineMode;
-                          final playlists = isOffline
-                              ? libraryProvider.playlists.where((p) => off.isPlaylistDownloaded(p.id)).toList()
-                              : libraryProvider.playlists;
-                          final albums = libraryProvider.recentAlbums;
-                          if (isOffline && playlists.isEmpty && albums.isEmpty) return const SizedBox.shrink();
-                          if (!isOffline && albums.isEmpty && playlists.isEmpty) return const SizedBox.shrink();
-                          return Column(children: [
-                            const SizedBox(height: 16),
-                            _QuickAccessGrid(
-                              albums: albums.take(isDesktop ? 6 : 4).toList(),
-                              playlists: playlists.take(isDesktop ? 3 : 2).toList(),
-                              isDesktop: isDesktop,
-                              hPad: hPad,
-                            ),
-                          ]);
-                        }),
-                      ],
-
-                      const SizedBox(height: 24),
-
-                      // Favorite Playlists перенесены в Миксы (home разгрузка, визуальная иерархия)
-                      // const FavoritePlaylistsSection() — теперь в mixes_screen.dart
-
-                      // Yandex Music Playlists Section — только при интеграции.
-                      if (PlayerUiSettingsService().getHomeShowYandex() &&
-                          yandexProvider.isEnabled)
-                        YandexPlaylistsSection(
-                          hPad: hPad,
-                          isDesktop: isDesktop,
-                        ),
-                      if (PlayerUiSettingsService().getHomeShowYandex() &&
-                          yandexProvider.isEnabled)
-                        const SizedBox(height: 24),
-
-                      if (PlayerUiSettingsService().getHomeShowPersonalized() &&
-                          recommendationService.enabled &&
-                          personalizedFeed.isNotEmpty) ...[
-                        _SectionTitle(
-                          title: AppLocalizations.of(context)!.forYou,
-                          icon: Icons.stars_rounded,
-                          hPad: hPad,
-                          isCollapsed: _collapsedSections.contains('forYou'),
-                          onToggle: () => _toggleSection('forYou'),
-                        ),
-                        if (!_collapsedSections.contains('forYou')) ...[
-                          if (isDesktop) _DesktopSongTableHeader(hPad: hPad),
-                          ...personalizedFeed.take(5).map((song) {
-                            if (isDesktop) {
-                              return _DesktopSongRow(
-                                song: song,
-                                playlist: personalizedFeed,
-                                index: personalizedFeed.indexOf(song),
+                            // Yandex My Wave section — только при включённой интеграции.
+                            if (PlayerUiSettingsService().getHomeShowYandex() &&
+                                yandexProvider.isEnabled) ...[
+                              const SizedBox(height: 16),
+                              YandexMyWaveSection(
                                 hPad: hPad,
-                              );
-                            }
-                            return SongTile(
-                              song: song,
-                              playlist: personalizedFeed,
-                              index: personalizedFeed.indexOf(song),
-                              showAlbum: true,
-                            );
-                          }),
-                        ],
-                        const SizedBox(height: 24),
-                      ],
+                                isDesktop: isDesktop,
+                              ),
+                            ],
 
-                      if (PlayerUiSettingsService().getHomeShowMixes() && mixes.containsKey('Quick Picks')) ...[
-                        _SectionTitle(
-                          title: AppLocalizations.of(context)!.quickPicks,
-                          icon: Icons.bolt_rounded,
-                          hPad: hPad,
-                          isCollapsed: _collapsedSections.contains('quickPicks'),
-                          onToggle: () => _toggleSection('quickPicks'),
-                        ),
-                        if (!_collapsedSections.contains('quickPicks')) ...[
-                          if (isDesktop) _DesktopSongTableHeader(hPad: hPad),
-                          ...mixes['Quick Picks']!.take(5).map((song) {
-                            if (isDesktop) {
-                              return _DesktopSongRow(
-                                song: song,
-                                playlist: mixes['Quick Picks']!,
-                                index: mixes['Quick Picks']!.indexOf(song),
+                            // Genre carousel — независим от Моя волна
+                            if (PlayerUiSettingsService()
+                                .getHomeShowGenre()) ...[
+                              const SizedBox(height: 24),
+                              GenreCarousel(
                                 hPad: hPad,
-                              );
-                            }
-                            return SongTile(
-                              song: song,
-                              playlist: mixes['Quick Picks']!,
-                              index: mixes['Quick Picks']!.indexOf(song),
-                              showAlbum: true,
-                            );
-                          }),
-                        ],
-                        const SizedBox(height: 24),
-                      ],
-
-                      if (PlayerUiSettingsService().getHomeShowMixes() && mixes.containsKey('Discover Mix')) ...[
-                        _SectionTitle(
-                          title: AppLocalizations.of(context)!.discoverMix,
-                          icon: Icons.explore_rounded,
-                          hPad: hPad,
-                          isCollapsed: _collapsedSections.contains('discoverMix'),
-                          onToggle: () => _toggleSection('discoverMix'),
-                        ),
-                        if (!_collapsedSections.contains('discoverMix')) ...[
-                          if (isDesktop) _DesktopSongTableHeader(hPad: hPad),
-                          ...mixes['Discover Mix']!.take(5).map((song) {
-                            if (isDesktop) {
-                              return _DesktopSongRow(
-                                song: song,
-                                playlist: mixes['Discover Mix']!,
-                                index: mixes['Discover Mix']!.indexOf(song),
-                                hPad: hPad,
-                              );
-                            }
-                            return SongTile(
-                              song: song,
-                              playlist: mixes['Discover Mix']!,
-                              index: mixes['Discover Mix']!.indexOf(song),
-                              showAlbum: true,
-                            );
-                          }),
-                        ],
-                        const SizedBox(height: 24),
-                      ],
-
-                      if (PlayerUiSettingsService().getHomeShowMixes())
-                        for (final entry in mixes.entries.where(
-                          (e) =>
-                              e.key != 'Quick Picks' &&
-                              e.key != 'Discover Mix' &&
-                              !e.key.contains('Vibes'),
-                        )) ...[
-                        _SectionTitle(
-                          title: _localizedMixTitle(context, entry.key),
-                          icon: Icons.album_rounded,
-                          hPad: hPad,
-                        ),
-                        if (isDesktop) _DesktopSongTableHeader(hPad: hPad),
-                        ...entry.value.take(5).map((song) {
-                          if (isDesktop) {
-                            return _DesktopSongRow(
-                              song: song,
-                              playlist: entry.value,
-                              index: entry.value.indexOf(song),
-                              hPad: hPad,
-                            );
-                          }
-                          return SongTile(
-                            song: song,
-                            playlist: entry.value,
-                            index: entry.value.indexOf(song),
-                            showAlbum: true,
-                          );
-                        }),
-                        const SizedBox(height: 24),
-                      ],
-
-                      if (PlayerUiSettingsService().getHomeShowMixes())
-                        for (final entry in mixes.entries.where(
-                          (e) => e.key.contains('Vibes'),
-                        )) ...[
-                        _SectionTitle(
-                          title: _localizedMixTitle(context, entry.key),
-                          icon: Icons.nightlight_round,
-                          hPad: hPad,
-                        ),
-                        if (isDesktop) _DesktopSongTableHeader(hPad: hPad),
-                        ...entry.value.take(5).map((song) {
-                          if (isDesktop) {
-                            return _DesktopSongRow(
-                              song: song,
-                              playlist: entry.value,
-                              index: entry.value.indexOf(song),
-                              hPad: hPad,
-                            );
-                          }
-                          return SongTile(
-                            song: song,
-                            playlist: entry.value,
-                            index: entry.value.indexOf(song),
-                            showAlbum: true,
-                          );
-                        }),
-                        const SizedBox(height: 24),
-                      ],
-
-                      if (PlayerUiSettingsService().getHomeShowRecentlyPlayed() && libraryProvider.recentAlbums.isNotEmpty) ...[
-                        HorizontalScrollSection(
-                          title: AppLocalizations.of(context)!.recentlyPlayed,
-                          padding: EdgeInsets.symmetric(horizontal: hPad),
-                          cardSize: isDesktop ? 180 : 150,
-                          children: libraryProvider.recentAlbums
-                              .take(10)
-                              .map(
-                                (album) => AlbumCard(
-                                  album: album,
-                                  size: isDesktop ? 180 : 150,
-                                  onTap: () => _openAlbum(context, album.id),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                        const SizedBox(height: 24),
-                      ],
-
-                      if (PlayerUiSettingsService().getHomeShowYourPlaylists() && libraryProvider.playlists.isNotEmpty) ...[
-                        HorizontalScrollSection(
-                          title: AppLocalizations.of(context)!.yourPlaylists,
-                          padding: EdgeInsets.symmetric(horizontal: hPad),
-                          cardSize: isDesktop ? 180 : 150,
-                          children: libraryProvider.playlists
-                              .take(10)
-                              .map(
-                                (playlist) => _PlaylistCard(
-                                  playlist: playlist,
-                                  size: isDesktop ? 180 : 150,
-                                  onTap: () => Navigator.push(
+                                isDesktop: isDesktop,
+                                onGenreTap: (genreId, genreName, color) {
+                                  Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => PlaylistScreen(
-                                        playlistId: playlist.id,
-                                        playlistName: playlist.name,
+                                      builder: (context) => GenrePlaylistScreen(
+                                        genreId: genreId,
+                                        genreName: genreName,
+                                        genreColor: color,
                                       ),
                                     ),
+                                  );
+                                },
+                              ),
+                            ],
+
+                            // Continue Listening — Books (outside MyWave)
+                            ValueListenableBuilder<bool>(
+                              valueListenable:
+                                  AudiobookshelfService().enabledNotifier,
+                              builder: (ctx, absEnabled, __) {
+                                if (!absEnabled ||
+                                    !AudiobookshelfService().isConfigured)
+                                  return const SizedBox.shrink();
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const SizedBox(height: 16),
+                                    _SectionTitle(
+                                      title: 'Продолжить слушать',
+                                      subtitle: 'Книги',
+                                      icon: Icons.menu_book_rounded,
+                                      hPad: hPad,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      height: 170,
+                                      child: FutureBuilder<
+                                          List<Map<String, dynamic>>>(
+                                        future: _getBooksFuture(),
+                                        builder: (ctx, snap) {
+                                          if (snap.connectionState ==
+                                              ConnectionState.waiting) {
+                                            return const Center(
+                                                child:
+                                                    CircularProgressIndicator());
+                                          }
+                                          final books = snap.data ?? [];
+                                          if (books.isEmpty) {
+                                            return const Center(
+                                                child: Text(
+                                                    'Нет книг в прогрессе',
+                                                    style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors.grey)));
+                                          }
+                                          return ListView.separated(
+                                            padding: EdgeInsets.symmetric(
+                                                horizontal: hPad),
+                                            scrollDirection: Axis.horizontal,
+                                            itemCount: books.length,
+                                            separatorBuilder: (_, __) =>
+                                                const SizedBox(width: 12),
+                                            itemBuilder: (c, i) {
+                                              final b = books[i];
+                                              final id = b['id'] as String? ??
+                                                  b['libraryItemId']
+                                                      as String? ??
+                                                  '';
+                                              final media = b['media'] ??
+                                                  b['libraryItem']?['media'];
+                                              final title = media?['metadata']
+                                                      ?['title'] ??
+                                                  b['media']?['metadata']
+                                                      ?['title'] ??
+                                                  b['title'] ??
+                                                  'Unknown';
+                                              final author = media?['metadata']
+                                                      ?['authorName'] ??
+                                                  b['media']?['metadata']
+                                                      ?['authorName'] ??
+                                                  '';
+                                              final cover =
+                                                  AudiobookshelfService()
+                                                      .getCoverUrl(id,
+                                                          width: 200);
+                                              final headers =
+                                                  AudiobookshelfService()
+                                                      .authHeaders;
+                                              // Robust progress extraction
+                                              double progRaw = 0;
+                                              bool isFinishedRaw = false;
+                                              double curTime = 0;
+                                              double durForCur = 0;
+                                              try {
+                                                durForCur =
+                                                    (media?['duration'] as num?)
+                                                            ?.toDouble() ??
+                                                        (b['media']?['duration']
+                                                                as num?)
+                                                            ?.toDouble() ??
+                                                        0;
+                                                final embedded = b[
+                                                        'userMediaProgress']
+                                                    as Map<String, dynamic>?;
+                                                if (embedded != null) {
+                                                  progRaw =
+                                                      (embedded['progress']
+                                                                  as num?)
+                                                              ?.toDouble() ??
+                                                          0;
+                                                  isFinishedRaw =
+                                                      embedded['isFinished']
+                                                              as bool? ??
+                                                          false;
+                                                  curTime =
+                                                      (embedded['currentTime']
+                                                                  as num?)
+                                                              ?.toDouble() ??
+                                                          0;
+                                                  if (durForCur > 0 &&
+                                                      progRaw == 0 &&
+                                                      curTime > 0)
+                                                    progRaw =
+                                                        (curTime / durForCur)
+                                                            .clamp(0, 1)
+                                                            .toDouble();
+                                                  if (curTime == 0 &&
+                                                      progRaw > 0 &&
+                                                      durForCur > 0)
+                                                    curTime =
+                                                        progRaw * durForCur;
+                                                  if (curTime == 0 &&
+                                                      progRaw == 0) {
+                                                    // Try alternative currentTime location
+                                                    curTime =
+                                                        (b['progress'] as num?)
+                                                                ?.toDouble() ??
+                                                            0;
+                                                    if (curTime > 0 &&
+                                                        curTime <= 1 &&
+                                                        durForCur > 0) {
+                                                      progRaw = curTime;
+                                                      curTime =
+                                                          progRaw * durForCur;
+                                                    }
+                                                  }
+                                                }
+                                                if (progRaw == 0) {
+                                                  progRaw =
+                                                      (b['progress'] as num?)
+                                                              ?.toDouble() ??
+                                                          0;
+                                                  if (progRaw > 0 &&
+                                                      curTime == 0 &&
+                                                      durForCur > 0)
+                                                    curTime =
+                                                        progRaw * durForCur;
+                                                }
+                                              } catch (_) {}
+                                              final isFinished =
+                                                  isFinishedRaw ||
+                                                      progRaw >= 0.99;
+                                              final prog = progRaw
+                                                  .clamp(0, 1)
+                                                  .toDouble();
+                                              return SizedBox(
+                                                width: 130,
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Stack(
+                                                      children: [
+                                                        GestureDetector(
+                                                          onTap: () => Navigator.push(
+                                                              c,
+                                                              MaterialPageRoute(
+                                                                  builder: (_) =>
+                                                                      AudiobookDetailScreen(
+                                                                          itemId:
+                                                                              id,
+                                                                          initialData:
+                                                                              b))),
+                                                          child: ClipRRect(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        12),
+                                                            child: cover.isNotEmpty
+                                                                ? CachedNetworkImage(
+                                                                    imageUrl:
+                                                                        cover,
+                                                                    httpHeaders:
+                                                                        headers,
+                                                                    width: 130,
+                                                                    height: 110,
+                                                                    fit: BoxFit
+                                                                        .cover,
+                                                                    errorWidget: (_, __, ___) => Container(
+                                                                        width:
+                                                                            130,
+                                                                        height:
+                                                                            110,
+                                                                        color: Colors.grey[
+                                                                            800],
+                                                                        child: const Icon(Icons.menu_book,
+                                                                            color: Colors
+                                                                                .white54)))
+                                                                : Container(
+                                                                    width: 130,
+                                                                    height: 110,
+                                                                    color: Colors
+                                                                            .grey[
+                                                                        800],
+                                                                    child: const Icon(
+                                                                        Icons.menu_book,
+                                                                        color: Colors.white54)),
+                                                          ),
+                                                        ),
+                                                        Positioned(
+                                                          bottom: 6,
+                                                          right: 6,
+                                                          child: Material(
+                                                            color: Theme.of(c)
+                                                                .colorScheme
+                                                                .primary,
+                                                            elevation: 4,
+                                                            shape:
+                                                                const CircleBorder(),
+                                                            child: InkWell(
+                                                              customBorder:
+                                                                  const CircleBorder(),
+                                                              onTap: () async {
+                                                                final messenger =
+                                                                    ScaffoldMessenger
+                                                                        .of(c);
+                                                                try {
+                                                                  // Use curTime if >5 sec, else try to derive from progress
+                                                                  double st =
+                                                                      curTime;
+                                                                  if (st == 0 &&
+                                                                      prog >
+                                                                          0 &&
+                                                                      durForCur >
+                                                                          0)
+                                                                    st = prog *
+                                                                        durForCur;
+                                                                  // If still 0 and book has progress, pass null to let helper fetch fresh progress
+                                                                  final double?
+                                                                      toPass =
+                                                                      st > 5
+                                                                          ? st
+                                                                          : null;
+                                                                  if (toPass !=
+                                                                      null) {
+                                                                    await AudiobookHelper.playBook(
+                                                                        c,
+                                                                        id,
+                                                                        b,
+                                                                        startTime:
+                                                                            toPass);
+                                                                  } else {
+                                                                    await AudiobookHelper
+                                                                        .playBook(
+                                                                            c,
+                                                                            id,
+                                                                            b);
+                                                                  }
+                                                                } catch (e) {
+                                                                  messenger.showSnackBar(
+                                                                      SnackBar(
+                                                                          content:
+                                                                              Text('Ошибка: $e')));
+                                                                }
+                                                              },
+                                                              child: const Padding(
+                                                                  padding:
+                                                                      EdgeInsets
+                                                                          .all(
+                                                                              10),
+                                                                  child: Icon(
+                                                                      Icons
+                                                                          .play_arrow_rounded,
+                                                                      size: 28,
+                                                                      color: Colors
+                                                                          .white)),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        Positioned(
+                                                          top: 4,
+                                                          right: 4,
+                                                          child:
+                                                              PopupMenuButton<
+                                                                  String>(
+                                                            padding:
+                                                                EdgeInsets.zero,
+                                                            icon: Container(
+                                                                padding:
+                                                                    const EdgeInsets
+                                                                        .all(4),
+                                                                decoration: BoxDecoration(
+                                                                    color: Colors
+                                                                        .black54,
+                                                                    borderRadius:
+                                                                        BorderRadius.circular(
+                                                                            8)),
+                                                                child: const Icon(
+                                                                    Icons
+                                                                        .more_horiz,
+                                                                    size: 12,
+                                                                    color: Colors
+                                                                        .white)),
+                                                            onSelected:
+                                                                (v) async {
+                                                              if (v == 'detail')
+                                                                Navigator.push(
+                                                                    c,
+                                                                    MaterialPageRoute(
+                                                                        builder: (_) => AudiobookDetailScreen(
+                                                                            itemId:
+                                                                                id,
+                                                                            initialData:
+                                                                                b)));
+                                                              if (v ==
+                                                                  'download') {
+                                                                final svc =
+                                                                    AudiobookshelfService();
+                                                                final detail =
+                                                                    await svc.fetchBookDetail(
+                                                                            id) ??
+                                                                        b;
+                                                                final files = svc
+                                                                    .getAudioFiles(
+                                                                        detail);
+                                                                final off =
+                                                                    OfflineService();
+                                                                await off
+                                                                    .init();
+                                                                await off.downloadBook(
+                                                                    itemId: id,
+                                                                    audioFiles:
+                                                                        files,
+                                                                    baseUrl: svc
+                                                                        .getUrl(),
+                                                                    token: svc
+                                                                        .getToken());
+                                                                if (c.mounted)
+                                                                  ScaffoldMessenger
+                                                                          .of(c)
+                                                                      .showSnackBar(const SnackBar(
+                                                                          content:
+                                                                              Text('Книга скачана')));
+                                                              }
+                                                              if (v ==
+                                                                  'delete') {
+                                                                final off =
+                                                                    OfflineService();
+                                                                await off
+                                                                    .init();
+                                                                await off
+                                                                    .deleteBook(
+                                                                        id);
+                                                                if (c.mounted)
+                                                                  ScaffoldMessenger
+                                                                          .of(c)
+                                                                      .showSnackBar(const SnackBar(
+                                                                          content:
+                                                                              Text('Кэш удалён')));
+                                                              }
+                                                            },
+                                                            itemBuilder: (_) =>
+                                                                const [
+                                                              PopupMenuItem(
+                                                                  value:
+                                                                      'detail',
+                                                                  child: Text(
+                                                                      'Подробнее')),
+                                                              PopupMenuItem(
+                                                                  value:
+                                                                      'download',
+                                                                  child: Text(
+                                                                      'Скачать')),
+                                                              PopupMenuItem(
+                                                                  value:
+                                                                      'delete',
+                                                                  child: Text(
+                                                                      'Удалить кэш')),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 6),
+                                                    Text(title.toString(),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: const TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .w600)),
+                                                    Text(author.toString(),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: TextStyle(
+                                                            fontSize: 11,
+                                                            color: Colors
+                                                                .grey[600])),
+                                                    if (prog > 0)
+                                                      Padding(
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .only(top: 4),
+                                                          child: LinearProgressIndicator(
+                                                              value: prog,
+                                                              minHeight: 2,
+                                                              backgroundColor:
+                                                                  Colors
+                                                                          .grey[
+                                                                      300],
+                                                              valueColor: AlwaysStoppedAnimation(
+                                                                  isFinished
+                                                                      ? Colors
+                                                                          .green
+                                                                      : Theme.of(
+                                                                              c)
+                                                                          .colorScheme
+                                                                          .primary))),
+                                                    if (isFinished)
+                                                      const Padding(
+                                                          padding:
+                                                              EdgeInsets.only(
+                                                                  top: 2),
+                                                          child: Text(
+                                                              'Завершено',
+                                                              style: TextStyle(
+                                                                  fontSize: 9,
+                                                                  color: Colors
+                                                                      .green))),
+                                                  ],
+                                                ),
+                                              );
+                                            },
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+
+                            if (PlayerUiSettingsService()
+                                .getHomeShowRecent()) ...[
+                              Builder(builder: (ctx) {
+                                final off = OfflineService();
+                                final isOffline = off.isOfflineMode;
+                                final playlists = isOffline
+                                    ? libraryProvider.playlists
+                                        .where((p) =>
+                                            off.isPlaylistDownloaded(p.id))
+                                        .toList()
+                                    : libraryProvider.playlists;
+                                final albums = libraryProvider.recentAlbums;
+                                if (isOffline &&
+                                    playlists.isEmpty &&
+                                    albums.isEmpty)
+                                  return const SizedBox.shrink();
+                                if (!isOffline &&
+                                    albums.isEmpty &&
+                                    playlists.isEmpty)
+                                  return const SizedBox.shrink();
+                                return Column(children: [
+                                  const SizedBox(height: 16),
+                                  _QuickAccessGrid(
+                                    albums:
+                                        albums.take(isDesktop ? 6 : 4).toList(),
+                                    playlists: playlists
+                                        .take(isDesktop ? 3 : 2)
+                                        .toList(),
+                                    isDesktop: isDesktop,
+                                    hPad: hPad,
                                   ),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                        const SizedBox(height: 24),
-                      ],
+                                ]);
+                              }),
+                            ],
 
-                      // === NEW SECTIONS ===
+                            const SizedBox(height: 24),
 
-                      // Latest Releases
-                      if (PlayerUiSettingsService().getHomeShowLatestReleases() && libraryProvider.randomSongs.isNotEmpty) ...[
-                        _SectionTitle(
-                          title: 'Последние релизы',
-                          icon: Icons.new_releases_rounded,
-                          hPad: hPad,
-                        ),
-                        _LatestReleasesSection(
-                          libraryProvider: libraryProvider,
-                          hPad: hPad,
-                        ),
-                        const SizedBox(height: 24),
-                      ],
+                            // Favorite Playlists перенесены в Миксы (home разгрузка, визуальная иерархия)
+                            // const FavoritePlaylistsSection() — теперь в mixes_screen.dart
 
-                      // Artist Mixes (Radio by Artist)
-                      if (PlayerUiSettingsService().getHomeShowArtistMixes() &&
-                          recommendationService.enabled &&
-                          libraryProvider.randomSongs.isNotEmpty) ...[
-                        _SectionTitle(
-                          title: 'Миксы по исполнителям',
-                          subtitle: 'Похожее на треки артиста',
-                          icon: Icons.wifi_tethering_rounded,
-                          hPad: hPad,
-                        ),
-                        _ArtistMixesSection(
-                          recommendationService: recommendationService,
-                          hPad: hPad,
-                        ),
-                        const SizedBox(height: 24),
-                      ],
-
-                      // Genre Mixes
-                      if (PlayerUiSettingsService().getHomeShowGenreMixes() && libraryProvider.cachedAllSongs.isNotEmpty) ...[
-                        _SectionTitle(
-                          title: 'Миксы по жанрам',
-                          subtitle: 'Начните с этого',
-                          icon: Icons.library_music_rounded,
-                          hPad: hPad,
-                          isCollapsed: _collapsedSections.contains('genreMixes'),
-                          onToggle: () => _toggleSection('genreMixes'),
-                        ),
-                        if (!_collapsedSections.contains('genreMixes'))
-                          _GenreMixesSection(
-                            songs: libraryProvider.cachedAllSongs,
-                            hPad: hPad,
-                          ),
-                        const SizedBox(height: 24),
-                      ],
-
-                      // Daily Playlist — с кэшем 24ч по дате (MixCacheService)
-                      if (PlayerUiSettingsService().getHomeShowDailyPlaylist() &&
-                          recommendationService.enabled &&
-                          libraryProvider.randomSongs.isNotEmpty) ...[
-                        _SectionTitle(
-                          title: 'Плейлист дня',
-                          subtitle: 'На основе ваших предпочтений',
-                          icon: Icons.calendar_today_rounded,
-                          hPad: hPad,
-                          isCollapsed: _collapsedSections.contains('dailyPlaylist'),
-                          onToggle: () => _toggleSection('dailyPlaylist'),
-                        ),
-                        if (!_collapsedSections.contains('dailyPlaylist'))
-                          Builder(builder: (ctx) {
-                            final pool = libraryProvider.cachedAllSongs.isNotEmpty
-                                ? libraryProvider.cachedAllSongs
-                                : libraryProvider.randomSongs;
-                            _ensureDailyPlaylist(pool, recommendationService);
-                            // Было: getPersonalizedFeed() на КАЖДЫЙ build — тяжёлый
-                            // скоринг всей библиотеки (лаг) + jitter, т.е. список
-                            // прыгал при каждой перестройке. Пока кэш грузится —
-                            // стабильный срез пула, затем _cachedDaily.
-                            final dailySongs = _cachedDaily.isNotEmpty
-                                ? _cachedDaily
-                                : pool.take(20).toList();
-                            return _DailyPlaylistSection(songs: dailySongs, hPad: hPad);
-                          }),
-                        const SizedBox(height: 24),
-                      ],
-
-                      // ИИ-микс дня — ежедневный микс от нейросети.
-                      // Тумблер: Настройки → Оформление → Главная → «ИИ-микс дня».
-                      // Тап — детали (слушать/сохранить/обновить); новый
-                      // несохранённый стирает предыдущий, сохранённые живут
-                      // в Плейлистах сами по себе.
-                      if (PlayerUiSettingsService().getHomeShowAiDaily()) ...[
-                        _SectionTitle(
-                          title: 'ИИ-микс дня',
-                          subtitle: 'Ежедневный микс от нейросети',
-                          icon: Icons.auto_awesome_rounded,
-                          hPad: hPad,
-                          isCollapsed: _collapsedSections.contains('aiDaily'),
-                          onToggle: () => _toggleSection('aiDaily'),
-                        ),
-                        if (!_collapsedSections.contains('aiDaily'))
-                          _AiDailyHomeCard(hPad: hPad),
-                        const SizedBox(height: 24),
-                      ],
-
-                      // Yandex Music: Similar Artists
-                      if (PlayerUiSettingsService().getHomeShowYandexSimilar() &&
-                          yandexProvider.isEnabled &&
-                          yandexProvider.hasToken &&
-                          libraryProvider.artists.isNotEmpty) ...[
-                        _SectionTitle(
-                          title: 'Похожие исполнители',
-                          subtitle: 'из Yandex Music',
-                          icon: Icons.explore_rounded,
-                          hPad: hPad,
-                        ),
-                        _YandexSimilarArtistsSection(
-                          artists: libraryProvider.artists,
-                          hPad: hPad,
-                        ),
-                        const SizedBox(height: 24),
-                      ],
-
-                      if (!recommendationService.enabled &&
-                          libraryProvider.randomSongs.isNotEmpty) ...[
-                        _SectionTitle(
-                          title: AppLocalizations.of(context)!.madeForYou,
-                          hPad: hPad,
-                        ),
-                        if (isDesktop) _DesktopSongTableHeader(hPad: hPad),
-                        ...libraryProvider.randomSongs.take(5).map((song) {
-                          final index = libraryProvider.randomSongs.indexOf(
-                            song,
-                          );
-                          if (isDesktop) {
-                            return _DesktopSongRow(
-                              song: song,
-                              playlist: libraryProvider.randomSongs,
-                              index: index,
-                              hPad: hPad,
-                            );
-                          }
-                          return SongTile(
-                            song: song,
-                            playlist: libraryProvider.randomSongs,
-                            index: index,
-                            showAlbum: true,
-                          );
-                        }),
-                        const SizedBox(height: 24),
-                      ],
-
-                      if (libraryProvider.recentAlbums.isEmpty &&
-                          libraryProvider.playlists.isEmpty &&
-                          libraryProvider.randomSongs.isEmpty &&
-                          mixes.isEmpty) ...[
-                        const SizedBox(height: 48),
-                        Center(
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.music_note_rounded,
-                                size: 64,
-                                color: Colors.grey[600],
+                            // Yandex Music Playlists Section — только при интеграции.
+                            if (PlayerUiSettingsService().getHomeShowYandex() &&
+                                yandexProvider.isEnabled)
+                              YandexPlaylistsSection(
+                                hPad: hPad,
+                                isDesktop: isDesktop,
                               ),
-                              const SizedBox(height: 16),
-                              Text(
-                                AppLocalizations.of(
-                                  context,
-                                )!
-                                    .noContentAvailable,
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey[600],
-                                ),
+                            if (PlayerUiSettingsService().getHomeShowYandex() &&
+                                yandexProvider.isEnabled)
+                              const SizedBox(height: 24),
+
+                            if (PlayerUiSettingsService()
+                                    .getHomeShowPersonalized() &&
+                                recommendationService.enabled &&
+                                personalizedFeed.isNotEmpty) ...[
+                              _SectionTitle(
+                                title: AppLocalizations.of(context)!.forYou,
+                                icon: Icons.stars_rounded,
+                                hPad: hPad,
+                                isCollapsed:
+                                    _collapsedSections.contains('forYou'),
+                                onToggle: () => _toggleSection('forYou'),
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                AppLocalizations.of(context)!.tryRefreshing,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[500],
+                              if (!_collapsedSections.contains('forYou')) ...[
+                                if (isDesktop)
+                                  _DesktopSongTableHeader(hPad: hPad),
+                                ...personalizedFeed.take(5).map((song) {
+                                  if (isDesktop) {
+                                    return _DesktopSongRow(
+                                      song: song,
+                                      playlist: personalizedFeed,
+                                      index: personalizedFeed.indexOf(song),
+                                      hPad: hPad,
+                                    );
+                                  }
+                                  return SongTile(
+                                    song: song,
+                                    playlist: personalizedFeed,
+                                    index: personalizedFeed.indexOf(song),
+                                    showAlbum: true,
+                                  );
+                                }),
+                              ],
+                              const SizedBox(height: 24),
+                            ],
+
+                            if (PlayerUiSettingsService().getHomeShowMixes() &&
+                                mixes.containsKey('Quick Picks')) ...[
+                              _SectionTitle(
+                                title: AppLocalizations.of(context)!.quickPicks,
+                                icon: Icons.bolt_rounded,
+                                hPad: hPad,
+                                isCollapsed:
+                                    _collapsedSections.contains('quickPicks'),
+                                onToggle: () => _toggleSection('quickPicks'),
+                              ),
+                              if (!_collapsedSections
+                                  .contains('quickPicks')) ...[
+                                if (isDesktop)
+                                  _DesktopSongTableHeader(hPad: hPad),
+                                ...mixes['Quick Picks']!.take(5).map((song) {
+                                  if (isDesktop) {
+                                    return _DesktopSongRow(
+                                      song: song,
+                                      playlist: mixes['Quick Picks']!,
+                                      index:
+                                          mixes['Quick Picks']!.indexOf(song),
+                                      hPad: hPad,
+                                    );
+                                  }
+                                  return SongTile(
+                                    song: song,
+                                    playlist: mixes['Quick Picks']!,
+                                    index: mixes['Quick Picks']!.indexOf(song),
+                                    showAlbum: true,
+                                  );
+                                }),
+                              ],
+                              const SizedBox(height: 24),
+                            ],
+
+                            if (PlayerUiSettingsService().getHomeShowMixes() &&
+                                mixes.containsKey('Discover Mix')) ...[
+                              _SectionTitle(
+                                title:
+                                    AppLocalizations.of(context)!.discoverMix,
+                                icon: Icons.explore_rounded,
+                                hPad: hPad,
+                                isCollapsed:
+                                    _collapsedSections.contains('discoverMix'),
+                                onToggle: () => _toggleSection('discoverMix'),
+                              ),
+                              if (!_collapsedSections
+                                  .contains('discoverMix')) ...[
+                                if (isDesktop)
+                                  _DesktopSongTableHeader(hPad: hPad),
+                                ...mixes['Discover Mix']!.take(5).map((song) {
+                                  if (isDesktop) {
+                                    return _DesktopSongRow(
+                                      song: song,
+                                      playlist: mixes['Discover Mix']!,
+                                      index:
+                                          mixes['Discover Mix']!.indexOf(song),
+                                      hPad: hPad,
+                                    );
+                                  }
+                                  return SongTile(
+                                    song: song,
+                                    playlist: mixes['Discover Mix']!,
+                                    index: mixes['Discover Mix']!.indexOf(song),
+                                    showAlbum: true,
+                                  );
+                                }),
+                              ],
+                              const SizedBox(height: 24),
+                            ],
+
+                            if (PlayerUiSettingsService().getHomeShowMixes())
+                              for (final entry in mixes.entries.where(
+                                (e) =>
+                                    e.key != 'Quick Picks' &&
+                                    e.key != 'Discover Mix' &&
+                                    !e.key.contains('Vibes'),
+                              )) ...[
+                                _SectionTitle(
+                                  title: _localizedMixTitle(context, entry.key),
+                                  icon: Icons.album_rounded,
+                                  hPad: hPad,
                                 ),
+                                if (isDesktop)
+                                  _DesktopSongTableHeader(hPad: hPad),
+                                ...entry.value.take(5).map((song) {
+                                  if (isDesktop) {
+                                    return _DesktopSongRow(
+                                      song: song,
+                                      playlist: entry.value,
+                                      index: entry.value.indexOf(song),
+                                      hPad: hPad,
+                                    );
+                                  }
+                                  return SongTile(
+                                    song: song,
+                                    playlist: entry.value,
+                                    index: entry.value.indexOf(song),
+                                    showAlbum: true,
+                                  );
+                                }),
+                                const SizedBox(height: 24),
+                              ],
+
+                            if (PlayerUiSettingsService().getHomeShowMixes())
+                              for (final entry in mixes.entries.where(
+                                (e) => e.key.contains('Vibes'),
+                              )) ...[
+                                _SectionTitle(
+                                  title: _localizedMixTitle(context, entry.key),
+                                  icon: Icons.nightlight_round,
+                                  hPad: hPad,
+                                ),
+                                if (isDesktop)
+                                  _DesktopSongTableHeader(hPad: hPad),
+                                ...entry.value.take(5).map((song) {
+                                  if (isDesktop) {
+                                    return _DesktopSongRow(
+                                      song: song,
+                                      playlist: entry.value,
+                                      index: entry.value.indexOf(song),
+                                      hPad: hPad,
+                                    );
+                                  }
+                                  return SongTile(
+                                    song: song,
+                                    playlist: entry.value,
+                                    index: entry.value.indexOf(song),
+                                    showAlbum: true,
+                                  );
+                                }),
+                                const SizedBox(height: 24),
+                              ],
+
+                            if (PlayerUiSettingsService()
+                                    .getHomeShowRecentlyPlayed() &&
+                                libraryProvider.recentAlbums.isNotEmpty) ...[
+                              HorizontalScrollSection(
+                                title: AppLocalizations.of(context)!
+                                    .recentlyPlayed,
+                                padding: EdgeInsets.symmetric(horizontal: hPad),
+                                cardSize: isDesktop ? 180 : 150,
+                                children: libraryProvider.recentAlbums
+                                    .take(10)
+                                    .map(
+                                      (album) => AlbumCard(
+                                        album: album,
+                                        size: isDesktop ? 180 : 150,
+                                        onTap: () =>
+                                            _openAlbum(context, album.id),
+                                      ),
+                                    )
+                                    .toList(),
                               ),
                               const SizedBox(height: 24),
-                              ElevatedButton.icon(
-                                onPressed: () => libraryProvider.refresh(),
-                                icon: const Icon(Icons.refresh),
-                                label: Text(
-                                  AppLocalizations.of(context)!.refresh,
+                            ],
+
+                            if (PlayerUiSettingsService()
+                                    .getHomeShowYourPlaylists() &&
+                                libraryProvider.playlists.isNotEmpty) ...[
+                              HorizontalScrollSection(
+                                title:
+                                    AppLocalizations.of(context)!.yourPlaylists,
+                                padding: EdgeInsets.symmetric(horizontal: hPad),
+                                cardSize: isDesktop ? 180 : 150,
+                                children: libraryProvider.playlists
+                                    .take(10)
+                                    .map(
+                                      (playlist) => _PlaylistCard(
+                                        playlist: playlist,
+                                        size: isDesktop ? 180 : 150,
+                                        onTap: () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                PlaylistScreen(
+                                              playlistId: playlist.id,
+                                              playlistName: playlist.name,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                              const SizedBox(height: 24),
+                            ],
+
+                            // === NEW SECTIONS ===
+
+                            // Latest Releases
+                            if (PlayerUiSettingsService()
+                                    .getHomeShowLatestReleases() &&
+                                libraryProvider.randomSongs.isNotEmpty) ...[
+                              _SectionTitle(
+                                title: 'Последние релизы',
+                                icon: Icons.new_releases_rounded,
+                                hPad: hPad,
+                              ),
+                              _LatestReleasesSection(
+                                libraryProvider: libraryProvider,
+                                hPad: hPad,
+                              ),
+                              const SizedBox(height: 24),
+                            ],
+
+                            // Artist Mixes (Radio by Artist)
+                            if (PlayerUiSettingsService()
+                                    .getHomeShowArtistMixes() &&
+                                recommendationService.enabled &&
+                                libraryProvider.randomSongs.isNotEmpty) ...[
+                              _SectionTitle(
+                                title: 'Миксы по исполнителям',
+                                subtitle: 'Похожее на треки артиста',
+                                icon: Icons.wifi_tethering_rounded,
+                                hPad: hPad,
+                              ),
+                              _ArtistMixesSection(
+                                recommendationService: recommendationService,
+                                hPad: hPad,
+                              ),
+                              const SizedBox(height: 24),
+                            ],
+
+                            // Genre Mixes
+                            if (PlayerUiSettingsService()
+                                    .getHomeShowGenreMixes() &&
+                                libraryProvider.cachedAllSongs.isNotEmpty) ...[
+                              _SectionTitle(
+                                title: 'Миксы по жанрам',
+                                subtitle: 'Начните с этого',
+                                icon: Icons.library_music_rounded,
+                                hPad: hPad,
+                                isCollapsed:
+                                    _collapsedSections.contains('genreMixes'),
+                                onToggle: () => _toggleSection('genreMixes'),
+                              ),
+                              if (!_collapsedSections.contains('genreMixes'))
+                                _GenreMixesSection(
+                                  songs: libraryProvider.cachedAllSongs,
+                                  hPad: hPad,
+                                ),
+                              const SizedBox(height: 24),
+                            ],
+
+                            // Daily Playlist — с кэшем 24ч по дате (MixCacheService)
+                            if (PlayerUiSettingsService()
+                                    .getHomeShowDailyPlaylist() &&
+                                recommendationService.enabled &&
+                                libraryProvider.randomSongs.isNotEmpty) ...[
+                              _SectionTitle(
+                                title: 'Плейлист дня',
+                                subtitle: 'На основе ваших предпочтений',
+                                icon: Icons.calendar_today_rounded,
+                                hPad: hPad,
+                                isCollapsed: _collapsedSections
+                                    .contains('dailyPlaylist'),
+                                onToggle: () => _toggleSection('dailyPlaylist'),
+                              ),
+                              if (!_collapsedSections.contains('dailyPlaylist'))
+                                Builder(builder: (ctx) {
+                                  final pool =
+                                      libraryProvider.cachedAllSongs.isNotEmpty
+                                          ? libraryProvider.cachedAllSongs
+                                          : libraryProvider.randomSongs;
+                                  _ensureDailyPlaylist(
+                                      pool, recommendationService);
+                                  // Было: getPersonalizedFeed() на КАЖДЫЙ build — тяжёлый
+                                  // скоринг всей библиотеки (лаг) + jitter, т.е. список
+                                  // прыгал при каждой перестройке. Пока кэш грузится —
+                                  // стабильный срез пула, затем _cachedDaily.
+                                  final dailySongs = _cachedDaily.isNotEmpty
+                                      ? _cachedDaily
+                                      : pool.take(20).toList();
+                                  return _DailyPlaylistSection(
+                                      songs: dailySongs, hPad: hPad);
+                                }),
+                              const SizedBox(height: 24),
+                            ],
+
+                            // ИИ-микс дня — ежедневный микс от нейросети.
+                            // Тумблер: Настройки → Оформление → Главная → «ИИ-микс дня».
+                            // Тап — детали (слушать/сохранить/обновить); новый
+                            // несохранённый стирает предыдущий, сохранённые живут
+                            // в Плейлистах сами по себе.
+                            if (PlayerUiSettingsService()
+                                .getHomeShowAiDaily()) ...[
+                              _SectionTitle(
+                                title: 'ИИ-микс дня',
+                                subtitle: 'Ежедневный микс от нейросети',
+                                icon: Icons.auto_awesome_rounded,
+                                hPad: hPad,
+                                isCollapsed:
+                                    _collapsedSections.contains('aiDaily'),
+                                onToggle: () => _toggleSection('aiDaily'),
+                              ),
+                              if (!_collapsedSections.contains('aiDaily'))
+                                _AiDailyHomeCard(hPad: hPad),
+                              const SizedBox(height: 24),
+                            ],
+
+                            // Yandex Music: Similar Artists
+                            if (PlayerUiSettingsService()
+                                    .getHomeShowYandexSimilar() &&
+                                yandexProvider.isEnabled &&
+                                yandexProvider.hasToken &&
+                                libraryProvider.artists.isNotEmpty) ...[
+                              _SectionTitle(
+                                title: 'Похожие исполнители',
+                                subtitle: 'из Yandex Music',
+                                icon: Icons.explore_rounded,
+                                hPad: hPad,
+                              ),
+                              _YandexSimilarArtistsSection(
+                                artists: libraryProvider.artists,
+                                hPad: hPad,
+                              ),
+                              const SizedBox(height: 24),
+                            ],
+
+                            if (!recommendationService.enabled &&
+                                libraryProvider.randomSongs.isNotEmpty) ...[
+                              _SectionTitle(
+                                title: AppLocalizations.of(context)!.madeForYou,
+                                hPad: hPad,
+                              ),
+                              if (isDesktop)
+                                _DesktopSongTableHeader(hPad: hPad),
+                              ...libraryProvider.randomSongs
+                                  .take(5)
+                                  .map((song) {
+                                final index =
+                                    libraryProvider.randomSongs.indexOf(
+                                  song,
+                                );
+                                if (isDesktop) {
+                                  return _DesktopSongRow(
+                                    song: song,
+                                    playlist: libraryProvider.randomSongs,
+                                    index: index,
+                                    hPad: hPad,
+                                  );
+                                }
+                                return SongTile(
+                                  song: song,
+                                  playlist: libraryProvider.randomSongs,
+                                  index: index,
+                                  showAlbum: true,
+                                );
+                              }),
+                              const SizedBox(height: 24),
+                            ],
+
+                            if (libraryProvider.recentAlbums.isEmpty &&
+                                libraryProvider.playlists.isEmpty &&
+                                libraryProvider.randomSongs.isEmpty &&
+                                mixes.isEmpty) ...[
+                              const SizedBox(height: 48),
+                              Center(
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      Icons.music_note_rounded,
+                                      size: 64,
+                                      color: Colors.grey[600],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      AppLocalizations.of(
+                                        context,
+                                      )!
+                                          .noContentAvailable,
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      AppLocalizations.of(context)!
+                                          .tryRefreshing,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[500],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 24),
+                                    ElevatedButton.icon(
+                                      onPressed: () =>
+                                          libraryProvider.refresh(),
+                                      icon: const Icon(Icons.refresh),
+                                      label: Text(
+                                        AppLocalizations.of(context)!.refresh,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
-                          ),
-                        ),
-                      ],
 
-                      const SizedBox(height: 150),
-                    ],
+                            const SizedBox(height: 150),
+                          ],
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
+                ),
+              ],
             ),
           ),
-            ],
+        ), // close Scaffold
+        // Быстрые действия выезжают вниз из-под стрелки, матовая подложка.
+        Positioned(
+          top: MediaQuery.of(context).padding.top + (isDesktop ? 64 : 44) + 8,
+          right: 12,
+          child: AnimatedOpacity(
+            opacity: _showQuickActions ? 1 : 0,
+            duration: const Duration(milliseconds: 200),
+            child: AnimatedSlide(
+              offset: _showQuickActions ? Offset.zero : const Offset(0, -0.25),
+              duration: const Duration(milliseconds: 200),
+              child: IgnorePointer(
+                ignoring: !_showQuickActions,
+                child: _buildQuickActionsPanel(isDark),
+              ),
+            ),
           ),
         ),
-      ), // close Scaffold
-      // Scroll to top button overlay
+        // Scroll to top button overlay
         if (_showScrollToTop)
           Positioned(
             right: 16,
@@ -1512,6 +1894,109 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
       ],
+    );
+  }
+
+  /// Матовая панель быстрых действий под стрелкой в шапке.
+  Widget _buildQuickActionsPanel(bool isDark) {
+    final fg = isDark ? Colors.white : Colors.black;
+
+    Widget action(IconData icon, String label, VoidCallback onTap,
+        {Widget? badge}) {
+      return SizedBox(
+        width: 66,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            setState(() => _showQuickActions = false);
+            onTap();
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                alignment: Alignment.topRight,
+                children: [
+                  Icon(icon, color: fg, size: 22),
+                  if (badge != null) badge,
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style:
+                    TextStyle(fontSize: 11, color: fg.withValues(alpha: 0.8)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xE6222222) : const Color(0xE6FFFFFF),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                action(CupertinoIcons.mic_fill, 'Слушать', () {
+                  NavigationHelper.push(context, const SonarScreen());
+                }),
+                action(CupertinoIcons.clock, 'История', () {
+                  NavigationHelper.push(context, const HistoryScreen());
+                }),
+                Consumer2<RemoteDiscovery, RemoteClient>(
+                  builder: (ctx, discovery, client, _) {
+                    final connected = client.isConnected;
+                    final hasDevices = discovery.found.isNotEmpty ||
+                        discovery.saved.isNotEmpty;
+                    return action(
+                      connected
+                          ? CupertinoIcons.desktopcomputer
+                          : CupertinoIcons.tv,
+                      'Пульт',
+                      () {
+                        NavigationHelper.push(ctx, const RemoteControlScreen());
+                      },
+                      badge: Positioned(
+                        right: 2,
+                        top: 0,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: connected
+                                ? Colors.green
+                                : (hasDevices
+                                    ? const Color(0xFF4E8CA8)
+                                    : Colors.transparent),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1933,7 +2418,8 @@ class _SectionTitle extends StatelessWidget {
             Row(
               children: [
                 if (icon != null) ...[
-                  Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+                  Icon(icon,
+                      size: 20, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 8),
                 ],
                 Flexible(
@@ -2265,7 +2751,8 @@ class _LatestReleasesSection extends StatelessWidget {
                   clipBehavior: Clip.antiAlias,
                   child: album.coverArt != null
                       ? CachedNetworkImage(
-                          imageUrl: Provider.of<SubsonicService>(context, listen: false)
+                          imageUrl: Provider.of<SubsonicService>(context,
+                                  listen: false)
                               .getCoverArtUrl(album.coverArt!, size: 300),
                           fit: BoxFit.cover,
                           errorWidget: (_, __, ___) => const Icon(
@@ -2316,7 +2803,8 @@ class _ArtistMixesSection extends StatelessWidget {
   final RecommendationService recommendationService;
   final double hPad;
 
-  const _ArtistMixesSection({required this.recommendationService, this.hPad = 16});
+  const _ArtistMixesSection(
+      {required this.recommendationService, this.hPad = 16});
 
   @override
   Widget build(BuildContext context) {
@@ -2362,7 +2850,8 @@ class _ArtistRadioCardState extends State<_ArtistRadioCard> {
 
   Future<void> _loadArtistCover() async {
     try {
-      final subsonicService = Provider.of<SubsonicService>(context, listen: false);
+      final subsonicService =
+          Provider.of<SubsonicService>(context, listen: false);
       final results = await subsonicService.search(
         widget.artistName,
         artistCount: 1,
@@ -2402,7 +2891,11 @@ class _ArtistRadioCardState extends State<_ArtistRadioCard> {
             ),
             clipBehavior: Clip.antiAlias,
             child: _isLoading
-                ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                ? const Center(
+                    child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2)))
                 : _coverUrl != null
                     ? Stack(
                         fit: StackFit.expand,
@@ -2451,7 +2944,9 @@ class _ArtistRadioCardState extends State<_ArtistRadioCard> {
       color: const Color(0xFF282828),
       child: Center(
         child: Text(
-          widget.artistName.isNotEmpty ? widget.artistName[0].toUpperCase() : '?',
+          widget.artistName.isNotEmpty
+              ? widget.artistName[0].toUpperCase()
+              : '?',
           style: const TextStyle(
             color: Colors.white54,
             fontSize: 28,
@@ -2464,8 +2959,9 @@ class _ArtistRadioCardState extends State<_ArtistRadioCard> {
 
   void _playArtistRadio(BuildContext context) async {
     final provider = context.read<PlayerProvider>();
-    final subsonicService = Provider.of<SubsonicService>(context, listen: false);
-    
+    final subsonicService =
+        Provider.of<SubsonicService>(context, listen: false);
+
     // First try to find songs by this artist via search
     try {
       final results = await subsonicService.search(
@@ -2474,7 +2970,7 @@ class _ArtistRadioCardState extends State<_ArtistRadioCard> {
         albumCount: 0,
         songCount: 25,
       );
-      
+
       if (results.songs.isNotEmpty) {
         // Shuffle for radio-like experience
         final shuffled = List<Song>.from(results.songs)..shuffle();
@@ -2488,10 +2984,12 @@ class _ArtistRadioCardState extends State<_ArtistRadioCard> {
     } catch (e) {
       debugPrint('Error searching artist songs: $e');
     }
-    
+
     // Fallback: use random songs from library
-    final allSongs = Provider.of<LibraryProvider>(context, listen: false).randomSongs;
-    final artistSongs = allSongs.where((s) => s.artist == widget.artistName).toList();
+    final allSongs =
+        Provider.of<LibraryProvider>(context, listen: false).randomSongs;
+    final artistSongs =
+        allSongs.where((s) => s.artist == widget.artistName).toList();
     if (artistSongs.isNotEmpty) {
       final shuffled = List<Song>.from(artistSongs)..shuffle();
       provider.playSong(
@@ -2522,8 +3020,7 @@ class _AiDailyHomeCard extends StatelessWidget {
         return GestureDetector(
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute(
-                  builder: (_) => const AiDailyDetailScreen()),
+              MaterialPageRoute(builder: (_) => const AiDailyDetailScreen()),
             );
           },
           child: Container(
@@ -2728,7 +3225,8 @@ class _GenreMixesSection extends StatelessWidget {
     final lower = genre.toLowerCase().trim();
     if (_genreColors.containsKey(lower)) return _genreColors[lower]!;
     for (final entry in _genreColors.entries) {
-      if (lower.contains(entry.key) || entry.key.contains(lower)) return entry.value;
+      if (lower.contains(entry.key) || entry.key.contains(lower))
+        return entry.value;
     }
     // hash fallback to avoid always grey
     final hash = lower.hashCode.abs();
@@ -2763,13 +3261,14 @@ class _GenreMixesSection extends StatelessWidget {
 
           return GestureDetector(
             onTap: () {
-              final genreSongs = songs.where((s) => s.genre == genre).toList()..shuffle();
+              final genreSongs = songs.where((s) => s.genre == genre).toList()
+                ..shuffle();
               if (genreSongs.isNotEmpty) {
                 context.read<PlayerProvider>().playSong(
-                  genreSongs.first,
-                  playlist: genreSongs,
-                  startIndex: 0,
-                );
+                      genreSongs.first,
+                      playlist: genreSongs,
+                      startIndex: 0,
+                    );
               }
             },
             child: Container(
@@ -3055,8 +3554,7 @@ class _MyWaveCustomizeSheet extends StatefulWidget {
 String _optionsSourceLabel(BuildContext context, BrainWaveOptions opts) {
   String src = 'встроенный';
   try {
-    final bridge =
-        Provider.of<KumaFlowBrainBridge>(context, listen: false);
+    final bridge = Provider.of<KumaFlowBrainBridge>(context, listen: false);
     src = switch (bridge.waveOptionsSource) {
       'server' => 'с сервера',
       'cache' => 'кеш',
@@ -3105,8 +3603,7 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
   /// Best-effort, молча.
   Future<void> _adoptSharedWaveSettings() async {
     try {
-      final bridge =
-          Provider.of<KumaFlowBrainBridge>(context, listen: false);
+      final bridge = Provider.of<KumaFlowBrainBridge>(context, listen: false);
       if (!bridge.isActive || bridge.isOfflineNow) return;
       final shared = await bridge
           .fetchSharedWaveSettings()
@@ -3134,8 +3631,7 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
   /// Ошибка/пусто — молча, остаются стандартные 4 настроения.
   Future<void> _loadServerMoods() async {
     try {
-      final bridge =
-          Provider.of<KumaFlowBrainBridge>(context, listen: false);
+      final bridge = Provider.of<KumaFlowBrainBridge>(context, listen: false);
       // 1) каталог (кеш/fallback мгновенно, сервер — best-effort следом).
       try {
         final opts = bridge.waveOptions;
@@ -3169,9 +3665,8 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
       if (!bridge.isActive) return;
       if (!mounted) return;
       setState(() => _serverMoodsLoading = true);
-      final tracks = await bridge
-          .waveContinue(queue: const [], count: 5)
-          .timeout(const Duration(seconds: 15));
+      final tracks = await bridge.waveContinue(
+          queue: const [], count: 5).timeout(const Duration(seconds: 15));
       final got = <String>{};
       for (final t in tracks) {
         for (final m in t.moods) {
@@ -3182,8 +3677,8 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
         if (got.length >= 6) break;
       }
       // Убираем дубли стандартных (регистр/язык не важен — сравнение в лоб).
-      got.removeWhere((m) =>
-          ['бодрое', 'весёлое', 'спокойное', 'грустное'].contains(m.toLowerCase()));
+      got.removeWhere((m) => ['бодрое', 'весёлое', 'спокойное', 'грустное']
+          .contains(m.toLowerCase()));
       if (!mounted) return;
       setState(() {
         _serverMoods = got.take(6).toList();
@@ -3210,47 +3705,78 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
     double? e, v, d, ac;
     switch (_mood) {
       case 'Бодрое':
-        e = 0.85; v = 0.7; d = 0.85; ac = 0.15;
+        e = 0.85;
+        v = 0.7;
+        d = 0.85;
+        ac = 0.15;
         break;
       case 'Весёлое':
-        e = 0.65; v = 0.85; d = 0.75; ac = 0.3;
+        e = 0.65;
+        v = 0.85;
+        d = 0.75;
+        ac = 0.3;
         break;
       case 'Спокойное':
-        e = 0.3; v = 0.55; d = 0.3; ac = 0.65;
+        e = 0.3;
+        v = 0.55;
+        d = 0.3;
+        ac = 0.65;
         break;
       case 'Грустное':
-        e = 0.35; v = 0.3; d = 0.35; ac = 0.5;
+        e = 0.35;
+        v = 0.3;
+        d = 0.35;
+        ac = 0.5;
         break;
     }
     // Занятие — дельта поверх настроения (или самостоятельный пресет).
     // Коды каталога /api/wave/options; старые RU-пилюли нормализуем.
     switch (normalizeBrainActivity(_activity)) {
       case 'wakeup':
-        e = (e ?? 0.55) - 0.1; v = v ?? 0.65; d = d ?? 0.5; ac = (ac ?? 0.4) + 0.1;
+        e = (e ?? 0.55) - 0.1;
+        v = v ?? 0.65;
+        d = d ?? 0.5;
+        ac = (ac ?? 0.4) + 0.1;
         break;
       case 'commute':
       case 'walk':
-        e = (e ?? 0.65) + 0.1; v = v ?? 0.6; d = (d ?? 0.6) + 0.1; ac = ac ?? 0.25;
+        e = (e ?? 0.65) + 0.1;
+        v = v ?? 0.6;
+        d = (d ?? 0.6) + 0.1;
+        ac = ac ?? 0.25;
         break;
       case 'work':
       case 'study':
-        e = (e ?? 0.45) - 0.1; v = v ?? 0.55; d = d ?? 0.35; ac = (ac ?? 0.5) + 0.2;
+        e = (e ?? 0.45) - 0.1;
+        v = v ?? 0.55;
+        d = d ?? 0.35;
+        ac = (ac ?? 0.5) + 0.2;
         break;
       case 'workout':
       case 'party':
-        e = (e ?? 0.75) + 0.1; v = v ?? 0.7; d = (d ?? 0.75) + 0.1; ac = ac ?? 0.2;
+        e = (e ?? 0.75) + 0.1;
+        v = v ?? 0.7;
+        d = (d ?? 0.75) + 0.1;
+        ac = ac ?? 0.2;
         break;
       case 'rest':
       case 'sleep':
-        e = (e ?? 0.35) - 0.1; v = v ?? 0.5; d = d ?? 0.3; ac = (ac ?? 0.5) + 0.2;
+        e = (e ?? 0.35) - 0.1;
+        v = v ?? 0.5;
+        d = d ?? 0.3;
+        ac = (ac ?? 0.5) + 0.2;
         break;
     }
     if (e == null) return null;
     double cl(double x) => x.clamp(0.05, 0.95).toDouble();
     final act = normalizeBrainActivity(_activity);
     return VibeFeatures(
-      energy: cl(e), valence: cl(v!), danceability: cl(d!),
-      bpm: 110, acousticness: cl(ac!), instrumentalness: (act == 'work' || act == 'study') ? 0.6 : 0.2,
+      energy: cl(e),
+      valence: cl(v!),
+      danceability: cl(d!),
+      bpm: 110,
+      acousticness: cl(ac!),
+      instrumentalness: (act == 'work' || act == 'study') ? 0.6 : 0.2,
     );
   }
 
@@ -3262,9 +3788,8 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
     final vibe = VibeSimilarity();
 
     // 1) Полный пул, а не 30 треков hero-карточки.
-    List<Song> base = lib.cachedAllSongs.isNotEmpty
-        ? lib.cachedAllSongs
-        : widget.songs;
+    List<Song> base =
+        lib.cachedAllSongs.isNotEmpty ? lib.cachedAllSongs : widget.songs;
     try {
       if (lib.isOfflineNow) base = lib.playablePool();
     } catch (_) {}
@@ -3277,11 +3802,13 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
     if (_character.isNotEmpty) {
       switch (normalizeBrainCharacteristic(_character)) {
         case 'favorite':
-          pool = pool.where((s) =>
-              s.starred == true ||
-              (s.userRating != null && s.userRating! >= 4) ||
-              (s.playCount != null && s.playCount! > 3) ||
-              ml.calculateTrackScore(s.id) > 20).toList();
+          pool = pool
+              .where((s) =>
+                  s.starred == true ||
+                  (s.userRating != null && s.userRating! >= 4) ||
+                  (s.playCount != null && s.playCount! > 3) ||
+                  ml.calculateTrackScore(s.id) > 20)
+              .toList();
           break;
         case 'unfamiliar':
           // Никогда не слушанные: серверные поля + ML-рейтинг + recent + без лайков.
@@ -3293,8 +3820,11 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
             final r = ml.ratings[s.id];
             final neverMl =
                 (r == null || ((r.playCount) == 0 && r.lastPlayed == null)) &&
-                (r?.like != true);
-            return neverServer && neverMl && s.starred != true && !recent.contains(s.id);
+                    (r?.like != true);
+            return neverServer &&
+                neverMl &&
+                s.starred != true &&
+                !recent.contains(s.id);
           }).toList();
           break;
         case 'popular':
@@ -3316,17 +3846,20 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
       final cyr = RegExp(r'[а-яёА-ЯЁ]');
       switch (normalizeBrainLanguage(_lang)) {
         case 'ru':
-          pool = pool.where((s) =>
-              cyr.hasMatch(s.title) ||
-              cyr.hasMatch(s.artist ?? '') ||
-              cyr.hasMatch(s.album ?? '')).toList();
+          pool = pool
+              .where((s) =>
+                  cyr.hasMatch(s.title) ||
+                  cyr.hasMatch(s.artist ?? '') ||
+                  cyr.hasMatch(s.album ?? ''))
+              .toList();
           break;
         case 'foreign':
           pool = pool.where((s) {
             final txt = '${s.title} ${s.artist ?? ''} ${s.album ?? ''}';
             if (cyr.hasMatch(txt)) return false;
             final g = (s.genre ?? '').toLowerCase();
-            if (g.contains('instrumental') || g.contains('classical')) return false;
+            if (g.contains('instrumental') || g.contains('classical'))
+              return false;
             return true;
           }).toList();
           break;
@@ -3334,10 +3867,14 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
           pool = pool.where((s) {
             final g = (s.genre ?? '').toLowerCase();
             final t = s.title.toLowerCase();
-            if (g.contains('instrumental') || g.contains('classical') ||
-                g.contains('soundtrack') || g.contains('ambient') ||
-                g.contains('lo-fi') || g.contains('lofi') ||
-                t.contains('instrumental') || t.contains('без слов')) return true;
+            if (g.contains('instrumental') ||
+                g.contains('classical') ||
+                g.contains('soundtrack') ||
+                g.contains('ambient') ||
+                g.contains('lo-fi') ||
+                g.contains('lofi') ||
+                t.contains('instrumental') ||
+                t.contains('без слов')) return true;
             // Алхимия-проверка: инструментальность по вайб-профилю жанра.
             return vibe.analyzeTrack(s).instrumentalness > 0.6;
           }).toList();
@@ -3356,16 +3893,43 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
         if (_mood.isNotEmpty) {
           switch (_mood) {
             case 'Бодрое':
-              okMood = m.contains('energetic') || m.contains('excited') || g.contains('dance') || g.contains('electronic') || g.contains('edm') || g.contains('house') || g.contains('pop') || g.contains('rock') || g.contains('hip');
+              okMood = m.contains('energetic') ||
+                  m.contains('excited') ||
+                  g.contains('dance') ||
+                  g.contains('electronic') ||
+                  g.contains('edm') ||
+                  g.contains('house') ||
+                  g.contains('pop') ||
+                  g.contains('rock') ||
+                  g.contains('hip');
               break;
             case 'Спокойное':
-              okMood = m.contains('calm') || m.contains('relax') || g.contains('ambient') || g.contains('classical') || g.contains('acoustic') || g.contains('jazz') || g.contains('chill') || g.contains('folk') || g.contains('lofi') || g.contains('lo-fi');
+              okMood = m.contains('calm') ||
+                  m.contains('relax') ||
+                  g.contains('ambient') ||
+                  g.contains('classical') ||
+                  g.contains('acoustic') ||
+                  g.contains('jazz') ||
+                  g.contains('chill') ||
+                  g.contains('folk') ||
+                  g.contains('lofi') ||
+                  g.contains('lo-fi');
               break;
             case 'Грустное':
-              okMood = m.contains('sad') || m.contains('melanchol') || g.contains('blues') || g.contains('folk') || g.contains('ballad');
+              okMood = m.contains('sad') ||
+                  m.contains('melanchol') ||
+                  g.contains('blues') ||
+                  g.contains('folk') ||
+                  g.contains('ballad');
               break;
             case 'Весёлое':
-              okMood = m.contains('happy') || m.contains('upbeat') || g.contains('disco') || g.contains('funk') || g.contains('pop') || g.contains('dance') || g.contains('latin');
+              okMood = m.contains('happy') ||
+                  m.contains('upbeat') ||
+                  g.contains('disco') ||
+                  g.contains('funk') ||
+                  g.contains('pop') ||
+                  g.contains('dance') ||
+                  g.contains('latin');
               break;
           }
         }
@@ -3373,23 +3937,53 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
           final act = normalizeBrainActivity(_activity);
           switch (act) {
             case 'wakeup':
-              okAct = m.contains('calm') || m.contains('happy') || g.contains('pop') || g.contains('acoustic') || g.contains('ambient') || g.contains('chill') || g.contains('folk');
+              okAct = m.contains('calm') ||
+                  m.contains('happy') ||
+                  g.contains('pop') ||
+                  g.contains('acoustic') ||
+                  g.contains('ambient') ||
+                  g.contains('chill') ||
+                  g.contains('folk');
               break;
             case 'commute':
             case 'walk':
-              okAct = g.contains('rock') || g.contains('electronic') || g.contains('hip') || g.contains('rap') || g.contains('dance') || g.contains('pop') || m.contains('energetic');
+              okAct = g.contains('rock') ||
+                  g.contains('electronic') ||
+                  g.contains('hip') ||
+                  g.contains('rap') ||
+                  g.contains('dance') ||
+                  g.contains('pop') ||
+                  m.contains('energetic');
               break;
             case 'work':
             case 'study':
-              okAct = g.contains('classical') || g.contains('jazz') || g.contains('ambient') || g.contains('instrumental') || g.contains('lofi') || g.contains('lo-fi') || g.contains('chill') || m.contains('calm') || m.contains('focus');
+              okAct = g.contains('classical') ||
+                  g.contains('jazz') ||
+                  g.contains('ambient') ||
+                  g.contains('instrumental') ||
+                  g.contains('lofi') ||
+                  g.contains('lo-fi') ||
+                  g.contains('chill') ||
+                  m.contains('calm') ||
+                  m.contains('focus');
               break;
             case 'workout':
             case 'party':
-              okAct = m.contains('energetic') || g.contains('dance') || g.contains('electronic') || g.contains('rock') || g.contains('hip') || m.contains('excited');
+              okAct = m.contains('energetic') ||
+                  g.contains('dance') ||
+                  g.contains('electronic') ||
+                  g.contains('rock') ||
+                  g.contains('hip') ||
+                  m.contains('excited');
               break;
             case 'rest':
             case 'sleep':
-              okAct = m.contains('calm') || m.contains('relax') || g.contains('ambient') || g.contains('classical') || g.contains('acoustic') || g.contains('chill');
+              okAct = m.contains('calm') ||
+                  m.contains('relax') ||
+                  g.contains('ambient') ||
+                  g.contains('classical') ||
+                  g.contains('acoustic') ||
+                  g.contains('chill');
               break;
             default:
               okAct = true;
@@ -3411,10 +4005,11 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
         final sample = List<Song>.from(tastePool)..shuffle();
         tastePool = sample.take(5000).toList();
       }
-      ranked = rec.getPersonalizedFeed(
-          tastePool, limit: tastePool.length > 300 ? 300 : tastePool.length);
+      ranked = rec.getPersonalizedFeed(tastePool,
+          limit: tastePool.length > 300 ? 300 : tastePool.length);
     } catch (_) {
-      ranked = ml.scoreAndSort(pool.length > 2000 ? pool.take(2000).toList() : pool);
+      ranked =
+          ml.scoreAndSort(pool.length > 2000 ? pool.take(2000).toList() : pool);
     }
     if (ranked.isEmpty) return [];
 
@@ -3428,7 +4023,8 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
         final q = player.queue;
         final curId = player.currentSong?.id;
         if (q.isNotEmpty) {
-          int idx = curId != null ? q.indexWhere((s) => s.id == curId) : q.length;
+          int idx =
+              curId != null ? q.indexWhere((s) => s.id == curId) : q.length;
           if (idx < 0) idx = q.length;
           final start = (idx - 10).clamp(0, q.length);
           final end = idx.clamp(0, q.length);
@@ -3437,11 +4033,21 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
             double e = 0, va = 0, d = 0, b = 0, ac = 0, ins = 0;
             for (final s in recent) {
               final f = vibe.analyzeTrack(s);
-              e += f.energy; va += f.valence; d += f.danceability;
-              b += f.bpm; ac += f.acousticness; ins += f.instrumentalness;
+              e += f.energy;
+              va += f.valence;
+              d += f.danceability;
+              b += f.bpm;
+              ac += f.acousticness;
+              ins += f.instrumentalness;
             }
             final n = recent.length.toDouble();
-            recentProfile = VibeFeatures(energy: e / n, valence: va / n, danceability: d / n, bpm: b / n, acousticness: ac / n, instrumentalness: ins / n);
+            recentProfile = VibeFeatures(
+                energy: e / n,
+                valence: va / n,
+                danceability: d / n,
+                bpm: b / n,
+                acousticness: ac / n,
+                instrumentalness: ins / n);
           }
         }
       } catch (_) {}
@@ -3463,7 +4069,10 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
         return MapEntry(s, score);
       }).toList()
         ..sort((a, b) => b.value.compareTo(a.value));
-      ranked = scored.take(scored.length > 200 ? 200 : scored.length).map((x) => x.key).toList();
+      ranked = scored
+          .take(scored.length > 200 ? 200 : scored.length)
+          .map((x) => x.key)
+          .toList();
     }
 
     // 8) Порядок под занятие + дайверсити артиста (макс 2 подряд/на волну).
@@ -3471,26 +4080,36 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
     String startWith = 'mixed', endWith = 'mixed';
     switch (normalizeBrainActivity(_activity)) {
       case 'wakeup':
-        startWith = 'calm'; endWith = 'energetic';
+        startWith = 'calm';
+        endWith = 'energetic';
         break;
       case 'work':
       case 'study':
       case 'rest':
       case 'sleep':
-        startWith = 'calm'; endWith = 'calm';
+        startWith = 'calm';
+        endWith = 'calm';
         break;
       case 'commute':
       case 'walk':
       case 'workout':
       case 'party':
-        startWith = 'energetic'; endWith = 'energetic';
+        startWith = 'energetic';
+        endWith = 'energetic';
         break;
       default:
-        if (_mood == 'Бодрое' || _mood == 'Весёлое') { startWith = 'energetic'; endWith = 'mixed'; }
-        if (_mood == 'Спокойное' || _mood == 'Грустное') { startWith = 'calm'; endWith = 'calm'; }
+        if (_mood == 'Бодрое' || _mood == 'Весёлое') {
+          startWith = 'energetic';
+          endWith = 'mixed';
+        }
+        if (_mood == 'Спокойное' || _mood == 'Грустное') {
+          startWith = 'calm';
+          endWith = 'calm';
+        }
     }
     try {
-      ranked = PlaylistOrchestrator.orchestrate(ranked, startWith: startWith, endWith: endWith);
+      ranked = PlaylistOrchestrator.orchestrate(ranked,
+          startWith: startWith, endWith: endWith);
     } catch (_) {}
 
     final out = <Song>[];
@@ -3524,14 +4143,15 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
   String get _hintLine {
     String act = _activity, cha = _character, lan = _lang;
     try {
-      final opts = Provider.of<KumaFlowBrainBridge>(context, listen: false)
-          .waveOptions;
+      final opts =
+          Provider.of<KumaFlowBrainBridge>(context, listen: false).waveOptions;
       if (act.isNotEmpty) act = opts.activityLabel(act);
       if (cha.isNotEmpty) cha = opts.characteristicLabel(cha);
       if (lan.isNotEmpty) lan = opts.languageLabel(lan);
     } catch (_) {}
     return [act, cha, _mood, lan].where((e) => e.isNotEmpty).join(' • ');
   }
+
   /// Генерация волны через KumaFlow Brain. Возвращает null, если мост
   /// неактивен, сервер ошибся/пуст — вызывающий падает назад
   /// на локальный _buildWave(). Пустой список сюда не возвращаем:
@@ -3545,9 +4165,9 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
       final queueIds = player.queue.map((s) => s.id).toList();
       bool languageStrict = false;
       try {
-        languageStrict = Provider.of<KumaFlowBrainSettings>(context,
-                listen: false)
-            .languageStrict;
+        languageStrict =
+            Provider.of<KumaFlowBrainSettings>(context, listen: false)
+                .languageStrict;
       } catch (_) {}
       final settingsMap = <String, dynamic>{
         if (normalizeBrainActivity(_activity).isNotEmpty)
@@ -3635,9 +4255,18 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
         final player = context.read<PlayerProvider>();
         final messenger = ScaffoldMessenger.of(context);
         Navigator.pop(context);
-        player.playSong(brainSongs.first, playlist: brainSongs);
+        player.playSong(
+          brainSongs.first,
+          playlist: brainSongs,
+          playlistName: 'Моя волна',
+          waveHint: hint.isEmpty ? 'Моя волна' : hint,
+          isWave: true,
+        );
         messenger.showSnackBar(
-          SnackBar(content: Text(hint.isEmpty ? 'Моя волна запущена (${brainSongs.length} треков) • KumaFlow Brain' : 'Волна: $hint • ${brainSongs.length} треков • KumaFlow Brain')),
+          SnackBar(
+              content: Text(hint.isEmpty
+                  ? 'Моя волна запущена (${brainSongs.length} треков) • KumaFlow Brain'
+                  : 'Волна: $hint • ${brainSongs.length} треков • KumaFlow Brain')),
         );
         return;
       }
@@ -3651,13 +4280,23 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
       final localMark =
           brainWasActive ? ' • локально (KumaFlow Brain не ответил)' : '';
       if (result.isNotEmpty) {
-        context.read<PlayerProvider>().playSong(result.first, playlist: result);
+        context.read<PlayerProvider>().playSong(
+              result.first,
+              playlist: result,
+              playlistName: 'Моя волна',
+              waveHint: hint.isEmpty ? 'Моя волна' : hint,
+              isWave: true,
+            );
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(hint.isEmpty ? 'Моя волна запущена (${result.length} треков)$localMark' : 'Волна: $hint • ${result.length} треков$localMark')),
+          SnackBar(
+              content: Text(hint.isEmpty
+                  ? 'Моя волна запущена (${result.length} треков)$localMark'
+                  : 'Волна: $hint • ${result.length} треков$localMark')),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ничего не нашлось — попробуйте смягчить фильтры')),
+          const SnackBar(
+              content: Text('Ничего не нашлось — попробуйте смягчить фильтры')),
         );
       }
     } finally {
@@ -3686,102 +4325,132 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: SingleChildScrollView(
-        controller: widget.scrollCtrl,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(width: 40, height: 4, decoration: BoxDecoration(color: isDark ? Colors.white24 : Colors.black12, borderRadius: BorderRadius.circular(2))),
-                Positioned(
-                  right: 0,
-                  child: IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 20),
-                    tooltip: 'Закрыть',
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            const Text('Настроить Мою волну', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-            if (brainOn)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                    'пилюли общие для всех устройств 🧠 • каталог: ${_optionsSourceLabel(context, brainOpts)}',
-                    style: const TextStyle(fontSize: 11, color: Colors.grey)),
-              ),
-            const SizedBox(height: 16),
-            _catalogWrap(
-              brainOn ? 'по занятию • с сервера 🧠' : 'по занятию',
-              acts,
-              _activity,
-              (code) => setState(
-                  () => _activity = code == _activity ? '' : code),
-            ),
-            const SizedBox(height: 12),
-            _catalogWrap(
-              'по характеру',
-              chars,
-              _character,
-              (code) => setState(
-                  () => _character = code == _character ? '' : code),
-              icons: const {'favorite': '❤️', 'unfamiliar': '✨', 'popular': '⚡'},
-            ),
-            const SizedBox(height: 12),
-            _group('под настроение', ['Бодрое', 'Весёлое', 'Спокойное', 'Грустное'], _mood, (v) => setState(() => _mood = v == _mood ? '' : v), colors: const [Color(0xFFFF6B00), Color(0xFF7ED321), Color(0xFF00C2FF), Color(0xFF3A5BFF)]),
-            if (_serverMoodsLoading)
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Center(
-                  child: SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2)),
-                ),
-              ),
-            if (!_serverMoodsLoading && _serverMoods.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              _serverMoodRow(),
-            ],
-            const SizedBox(height: 12),
-            _catalogWrap(
-              'по языку',
-              langs,
-              _lang,
-              (code) =>
-                  setState(() => _lang = code == _lang ? '' : code),
-            ),
-            if (brainOn) ...[
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+          controller: widget.scrollCtrl,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                alignment: Alignment.center,
                 children: [
-                  const Text('Строго по языку',
-                      style: TextStyle(fontSize: 12)),
-                  const SizedBox(width: 8),
-                  Switch(
-                    value: brainSettings.languageStrict,
-                    onChanged: (v) => brainSettings.setLanguageStrict(v),
+                  Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                          color: isDark ? Colors.white24 : Colors.black12,
+                          borderRadius: BorderRadius.circular(2))),
+                  Positioned(
+                    right: 0,
+                    child: IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 20),
+                      tooltip: 'Закрыть',
+                      onPressed: () => Navigator.pop(context),
+                    ),
                   ),
                 ],
               ),
-            ],
-            const SizedBox(height: 12),
-            Row(children: [
-              TextButton(onPressed: () => setState(() { _activity=''; _character=''; _mood=''; _lang=''; }), child: const Text('Сбросить')),
-              const Spacer(),
-              FilledButton(
-                onPressed: _isApplying ? null : _applyWave,
-                child: _isApplying
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Применить'),
+              const SizedBox(height: 8),
+              const Text('Настроить Мою волну',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              if (brainOn)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                      'пилюли общие для всех устройств 🧠 • каталог: ${_optionsSourceLabel(context, brainOpts)}',
+                      style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                ),
+              const SizedBox(height: 16),
+              _catalogWrap(
+                brainOn ? 'по занятию • с сервера 🧠' : 'по занятию',
+                acts,
+                _activity,
+                (code) =>
+                    setState(() => _activity = code == _activity ? '' : code),
               ),
-            ]),
-          ],
-        ),
+              const SizedBox(height: 12),
+              _catalogWrap(
+                'по характеру',
+                chars,
+                _character,
+                (code) =>
+                    setState(() => _character = code == _character ? '' : code),
+                icons: const {
+                  'favorite': '❤️',
+                  'unfamiliar': '✨',
+                  'popular': '⚡'
+                },
+              ),
+              const SizedBox(height: 12),
+              _group(
+                  'под настроение',
+                  ['Бодрое', 'Весёлое', 'Спокойное', 'Грустное'],
+                  _mood,
+                  (v) => setState(() => _mood = v == _mood ? '' : v),
+                  colors: const [
+                    Color(0xFFFF6B00),
+                    Color(0xFF7ED321),
+                    Color(0xFF00C2FF),
+                    Color(0xFF3A5BFF)
+                  ]),
+              if (_serverMoodsLoading)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Center(
+                    child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2)),
+                  ),
+                ),
+              if (!_serverMoodsLoading && _serverMoods.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _serverMoodRow(),
+              ],
+              const SizedBox(height: 12),
+              _catalogWrap(
+                'по языку',
+                langs,
+                _lang,
+                (code) => setState(() => _lang = code == _lang ? '' : code),
+              ),
+              if (brainOn) ...[
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Строго по языку',
+                        style: TextStyle(fontSize: 12)),
+                    const SizedBox(width: 8),
+                    Switch(
+                      value: brainSettings.languageStrict,
+                      onChanged: (v) => brainSettings.setLanguageStrict(v),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 12),
+              Row(children: [
+                TextButton(
+                    onPressed: () => setState(() {
+                          _activity = '';
+                          _character = '';
+                          _mood = '';
+                          _lang = '';
+                        }),
+                    child: const Text('Сбросить')),
+                const Spacer(),
+                FilledButton(
+                  onPressed: _isApplying ? null : _applyWave,
+                  child: _isApplying
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Text('Применить'),
+                ),
+              ]),
+            ],
+          ),
         ),
       ),
     );
@@ -3814,8 +4483,7 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
             final sel = o.code == selected;
             final emoji = icons?[o.code];
             final pill = Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
                 color: sel
                     ? (isDark ? Colors.white : Colors.black)
@@ -3848,7 +4516,7 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
     ]);
   }
 
-    /// Строка настроений с сервера мозга: те же пилюли, что в _group,
+  /// Строка настроений с сервера мозга: те же пилюли, что в _group,
   /// но через Wrap (меток может быть до 6 — в Row не влезут).
   /// Тап пишет значение в _mood как есть (сервер нормализует сам).
   Widget _serverMoodRow() {
@@ -3889,8 +4557,7 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
                 child: Text(it,
                     style: TextStyle(
                         fontSize: 12,
-                        fontWeight:
-                            sel ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
                         color: sel
                             ? (isDark ? Colors.black : Colors.white)
                             : (isDark ? Colors.white : Colors.black))),
@@ -3902,34 +4569,107 @@ class _MyWaveCustomizeSheetState extends State<_MyWaveCustomizeSheet> {
     ]);
   }
 
-  Widget _group(String title, List<String> items, String selected, Function(String) onTap, {List<String>? icons, List<Color>? colors}) {    final isDark = Theme.of(context).brightness == Brightness.dark;
+  Widget _group(
+      String title, List<String> items, String selected, Function(String) onTap,
+      {List<String>? icons, List<Color>? colors}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Center(child: Text(title, style: TextStyle(fontSize: 11, color: Colors.grey[600], fontWeight: FontWeight.w600))),
+      Center(
+          child: Text(title,
+              style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w600))),
       const SizedBox(height: 8),
-      Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(items.length, (i) {
-        final it = items[i];
-        final sel = it == selected;
-        Widget child;
-        if (colors != null) {
-          child = Column(children: [Container(width: 48, height: 48, decoration: BoxDecoration(shape: BoxShape.circle, color: colors[i], border: sel ? Border.all(color: isDark ? Colors.white : Colors.black, width: 2.5) : null, boxShadow: sel ? [BoxShadow(color: colors[i].withValues(alpha: 0.5), blurRadius: 8)] : null)), const SizedBox(height: 4), Text(it, style: TextStyle(fontSize: 11, fontWeight: sel ? FontWeight.w700 : FontWeight.w500))]);
-        } else if (icons != null) {
-          child = Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), decoration: BoxDecoration(color: sel ? (isDark ? Colors.white : Colors.black) : (isDark ? Colors.white10 : Colors.grey[100]), borderRadius: BorderRadius.circular(12), border: sel ? Border.all(color: isDark ? Colors.white : Colors.black, width: 1.5) : null), child: Column(children: [Text(icons[i], style: const TextStyle(fontSize: 20)), const SizedBox(height: 2), Text(it, style: TextStyle(fontSize: 11, color: sel ? (isDark ? Colors.black : Colors.white) : (isDark ? Colors.white : Colors.black), fontWeight: sel ? FontWeight.w700 : FontWeight.w500))]));
-        } else {
-          // pills "по занятию" / "по языку" — явная инверсия без ChoiceChip (фикс черный текст на черном)
-          child = AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: sel ? (isDark ? Colors.white : Colors.black) : (isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey[100]),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: sel ? (isDark ? Colors.white : Colors.black) : (isDark ? Colors.white24 : Colors.black12)),
-            ),
-            child: Text(it, style: TextStyle(fontSize: 12, fontWeight: sel ? FontWeight.w700 : FontWeight.w500, color: sel ? (isDark ? Colors.black : Colors.white) : (isDark ? Colors.white : Colors.black))),
-          );
-        }
-        return Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: GestureDetector(onTap: () => onTap(it), child: child));
-      })),
+      Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(items.length, (i) {
+            final it = items[i];
+            final sel = it == selected;
+            Widget child;
+            if (colors != null) {
+              child = Column(children: [
+                Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: colors[i],
+                        border: sel
+                            ? Border.all(
+                                color: isDark ? Colors.white : Colors.black,
+                                width: 2.5)
+                            : null,
+                        boxShadow: sel
+                            ? [
+                                BoxShadow(
+                                    color: colors[i].withValues(alpha: 0.5),
+                                    blurRadius: 8)
+                              ]
+                            : null)),
+                const SizedBox(height: 4),
+                Text(it,
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: sel ? FontWeight.w700 : FontWeight.w500))
+              ]);
+            } else if (icons != null) {
+              child = Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                      color: sel
+                          ? (isDark ? Colors.white : Colors.black)
+                          : (isDark ? Colors.white10 : Colors.grey[100]),
+                      borderRadius: BorderRadius.circular(12),
+                      border: sel
+                          ? Border.all(
+                              color: isDark ? Colors.white : Colors.black,
+                              width: 1.5)
+                          : null),
+                  child: Column(children: [
+                    Text(icons[i], style: const TextStyle(fontSize: 20)),
+                    const SizedBox(height: 2),
+                    Text(it,
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: sel
+                                ? (isDark ? Colors.black : Colors.white)
+                                : (isDark ? Colors.white : Colors.black),
+                            fontWeight:
+                                sel ? FontWeight.w700 : FontWeight.w500))
+                  ]));
+            } else {
+              // pills "по занятию" / "по языку" — явная инверсия без ChoiceChip (фикс черный текст на черном)
+              child = AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: sel
+                      ? (isDark ? Colors.white : Colors.black)
+                      : (isDark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.grey[100]),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: sel
+                          ? (isDark ? Colors.white : Colors.black)
+                          : (isDark ? Colors.white24 : Colors.black12)),
+                ),
+                child: Text(it,
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                        color: sel
+                            ? (isDark ? Colors.black : Colors.white)
+                            : (isDark ? Colors.white : Colors.black))),
+              );
+            }
+            return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: GestureDetector(onTap: () => onTap(it), child: child));
+          })),
     ]);
   }
 }
-
